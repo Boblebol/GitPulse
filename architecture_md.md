@@ -12,18 +12,18 @@
 ```
 Git repo on disk
       │
-      ▼ git2 crate (worktree séparé)
+      ▼ git2/libgit2 revwalk on selected branch
 ┌─────────────────┐
 │   Git scanner   │  ← src-tauri/src/git/scanner.rs
-│  (incremental)  │
+│ batched + resumable
 └────────┬────────┘
-         │ INSERT (append-only)
+         │ transactional batch INSERT
          ▼
 ┌─────────────────────────┐
 │  Layer 1 — Raw facts    │  commits + commit_file_changes
 └────────────┬────────────┘
-             │ triggered by: new scan | alias merge | formula change
-             ▼ SQL aggregation (no Rust loop)
+             │ mark dirty repo/date scopes
+             ▼ scoped aggregation
 ┌─────────────────────────┐
 │  Layer 3 — Aggregates   │  stats_daily_* + stats_*_global
 └────────────┬────────────┘
@@ -34,7 +34,7 @@ Git repo on disk
 └─────────────────────────┘
 ```
 
-## Why 3-layer database
+## Why layered database
 
 **Problem**: recalculating stats on every UI read from raw commits would be O(n commits) per query. On a repo with 50k commits, that's unusably slow.
 
@@ -42,6 +42,12 @@ Git repo on disk
 - Layer 1 is append-only → safe to always keep, never corrupted by logic changes
 - Layer 3 is fully derived → can always be dropped and rebuilt from layer 1
 - Alias merge doesn't require touching commit data — only `aliases.developer_id` links them, aggregates just re-GROUP
+
+Additional scan-control tables keep long-running scans durable:
+
+- `scan_runs`: running, paused, completed, failed state plus counters and error message
+- `repo_branch_cursors`: last indexed commit per `(repo, branch)`
+- `dirty_aggregate_scopes`: `(repo_id, date)` rows that need scoped aggregate rebuilds
 
 ## Why `git2` over shell subprocess
 
@@ -52,15 +58,45 @@ Git repo on disk
 
 ## Why worktree
 
-The user's working tree must never be touched (dirty index, uncommitted changes, etc.). A `git worktree` gives us a clean checkout on the target branch without disturbing the user's workspace.
+The scanner reads Git object data through `git2` and does not mutate the user's
+working tree. It also attempts to create a `gitpulse-analysis` worktree at
+`<repo>/.gitpulse-worktree/` for analysis isolation.
 
-Worktree path today: `<repo>/.gitpulse-worktree/`. This directory can appear as untracked in the analyzed repository, so it must be ignored explicitly until worktree placement is moved outside the target repo.
+Current caveat: `.gitpulse-worktree/` can appear as untracked in the analyzed
+repository, so it should stay ignored until worktree placement is moved outside
+the target repo.
 
 ## Aggregation engine design
 
-All aggregation is SQL, not Rust loops. Rust only:
-1. Triggers the recalculation
-2. Injects formula variable bindings via `evalexpr` for the player score
+Aggregation is mostly SQL, with small Rust-side helpers where SQLite is a poor
+fit:
+
+1. Rust triggers full or scoped recalculation.
+2. SQL builds daily developer/file aggregates and most global aggregates.
+3. Rust expands file paths into recursive directory parents before inserting
+   `stats_daily_directory`.
+4. SQL computes file `co_touch_score`: for a commit touching `N` distinct
+   files, each touched file gains `N - 1`.
+5. Rust injects formula variable bindings via `evalexpr` for player score.
+
+Scan-triggered recalculation is scoped:
+
+```
+scan batch committed
+      │
+      ▼
+dirty_aggregate_scopes(repo_id, date)
+      │
+      ▼
+recalculate_repo_dates(scopes)
+      │
+      ├─ rebuild daily developer/file/directory rows for those dates
+      ├─ refresh affected global developers/files/directories
+      └─ clear dirty scopes after successful recalculation
+```
+
+Alias merges and formula changes still call `recalculate_all`, because they can
+invalidate broad historical stats.
 
 Streak calculation uses SQL window functions:
 ```sql
@@ -103,8 +139,8 @@ git2::Error
 ```
 src/
 ├── hooks/
-│   ├── useRepo.ts          # invoke wrappers with React Query
-│   ├── useDeveloper.ts
+│   ├── useRepos.ts         # repo/scan invoke wrappers with React Query
+│   ├── useDevelopers.ts
 │   └── useStats.ts
 ├── pages/
 │   ├── Dashboard.tsx
@@ -113,12 +149,39 @@ src/
 │   ├── BoxScore.tsx
 │   └── AliasManager.tsx
 └── components/
-    ├── BoxScoreCard.tsx
-    ├── FileTree.tsx
-    └── StatBar.tsx
+    ├── ActivityChart.tsx
+    ├── Layout.tsx
+    ├── Sidebar.tsx
+    └── StatCard.tsx
 ```
 
-All `invoke()` calls wrapped in typed hooks. Pages never call `invoke()` directly.
+All `invoke()` calls are wrapped in typed hooks. Pages do not call `invoke()`
+directly. Routes use `createHashRouter` for Tauri compatibility and each page is
+loaded with `React.lazy`/`Suspense`. Vite splits React/Tauri/visualization
+dependencies into manual chunks.
+
+## Verification and performance checks
+
+Normal checks:
+
+```bash
+pnpm exec jest --runInBand
+pnpm build
+cd src-tauri
+cargo test
+cargo clippy --all-targets -- -D warnings
+```
+
+Manual large-repo benchmark:
+
+```bash
+cd src-tauri
+cargo test large_repo_benchmark -- --ignored --nocapture
+```
+
+The benchmark reports generation duration, scan duration, aggregate duration,
+files processed, and peak scan batch size. It can be scaled with
+`GITPULSE_BENCH_COMMITS` and `GITPULSE_BENCH_FILES_PER_COMMIT`.
 
 ## SQLite pragmas (set on connection)
 

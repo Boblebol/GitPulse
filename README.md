@@ -62,25 +62,55 @@ cd src-tauri
 cargo clippy --all-targets -- -D warnings
 ```
 
+Large-repo synthetic benchmark (ignored by default):
+
+```bash
+cd src-tauri
+cargo test large_repo_benchmark -- --ignored --nocapture
+```
+
+Optional benchmark sizing:
+
+```bash
+GITPULSE_BENCH_COMMITS=5000 GITPULSE_BENCH_FILES_PER_COMMIT=3 \
+  cargo test large_repo_benchmark -- --ignored --nocapture
+```
+
 ## Current Architecture
 
 The app stores data in a local SQLite database under the Tauri app data
-directory. The database has three layers:
+directory. The database is local-first and has durable scan state plus derived
+analytics layers:
 
-1. Raw facts: `commits`, `commit_file_changes`
-2. Reference data: `developers`, `aliases`, `files`, `repos`, `workspaces`
-3. Derived aggregates: `stats_daily_*`, `stats_*_global`
+1. Scan state: `scan_runs`, `repo_branch_cursors`
+2. Raw facts: `commits`, `commit_file_changes`
+3. Reference data: `developers`, `aliases`, `files`, `repos`, `workspaces`
+4. Derived aggregates: `stats_daily_*`, `stats_*_global`
+5. Dirty aggregate scopes: `dirty_aggregate_scopes`
 
-The scanner currently performs a full first scan and an incremental rescan based
-on `repos.last_indexed_commit_sha`. Aggregates are rebuilt after scans, alias
-changes, and formula changes.
+The scanner performs a full first scan and then incremental rescans from a
+branch-specific cursor. Commits are persisted in batches of 500 by default,
+with scan progress emitted to the UI. Running scans can be paused; paused or
+failed scans can be resumed from the persisted cursor.
+
+Each persisted batch records dirty `(repo_id, date)` aggregate scopes. After a
+scan completes, only dirty daily developer/file/directory rows are rebuilt, and
+affected global developer/file/directory rows are refreshed. Alias merges and
+formula changes still use full aggregate recalculation because they can affect
+the whole derived dataset.
+
+Directory metrics are recursive: `src/a/b.ts` contributes to both `src` and
+`src/a`. File coupling is exposed through `co_touch_score`: for each commit
+touching `N` distinct files, each touched file gains `N - 1`.
+
+The React app uses hash routing for Tauri compatibility and lazy-loads route
+pages with `React.lazy`/`Suspense`. Vite splits React, Tauri, and visualization
+dependencies into manual chunks.
 
 ## Known Limitations
 
-- Large repository scans are not yet chunked or resumable.
-- Scan progress is not streamed to the UI yet.
-- Aggregate recalculation is still global, not scoped to changed repo/date rows.
 - `.gitpulse-worktree/` can appear as an untracked directory in analyzed repos;
   keep it ignored until worktree placement is redesigned.
-- Directory metrics are parent-directory based; recursive directory rollups and
-  co-touch score are planned next.
+- Existing databases created before recursive directory aggregation may need a
+  full aggregate rebuild before historical directory rows reflect every parent
+  directory.

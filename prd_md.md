@@ -9,8 +9,10 @@ Local Tauri 2 desktop app for deep Git repository analysis. Gives an NBA box-sco
 ### Repos & workspaces
 - A **workspace** groups N repos (e.g. `backend` + `frontend`)
 - Each repo has one active branch selected for analysis
-- Analysis runs in a `git worktree` — the user's working tree is never touched
-- Scan strategy: full scan on first add, incremental on rescan (from last indexed SHA)
+- Analysis reads Git object data through `git2` and does not mutate the user's working tree
+- Scanner may create a `gitpulse-analysis` worktree at `.gitpulse-worktree/` for isolation
+- Scan strategy: full scan on first add, then incremental per branch from durable cursors
+- Scan runs are persisted and can be paused, resumed, or retried after failure
 
 ### Alias system
 - Multiple git identities (name + email combinations) map to one canonical developer
@@ -61,12 +63,14 @@ Daily developer card showing:
 
 ## Data model summary
 
-**3-layer SQLite database:**
+**SQLite database:**
 1. **Raw facts** (append-only): `commits`, `commit_file_changes`
-2. **Reference data**: `developers`, `aliases`, `files`, `file_name_history`, `repos`, `workspaces`, `metric_formulas`
-3. **Aggregates** (recalculated on demand): `stats_daily_developer`, `stats_daily_file`, `stats_daily_directory`, `stats_developer_global`, `stats_file_global`, `stats_directory_global`
+2. **Scan state**: `scan_runs`, `repo_branch_cursors`
+3. **Reference data**: `developers`, `aliases`, `files`, `file_name_history`, `repos`, `workspaces`, `metric_formulas`
+4. **Aggregates** (recalculated on demand): `stats_daily_developer`, `stats_daily_file`, `stats_daily_directory`, `stats_developer_global`, `stats_file_global`, `stats_directory_global`
+5. **Dirty scopes**: `dirty_aggregate_scopes` for repo/date incremental aggregate refresh
 
-All UI reads from layer 3. All recalcs are pure SQL triggered by Rust. Git re-parse only for new commits.
+All UI reads from aggregate tables. Scan-triggered recalculation is scoped to dirty repo/date rows; alias merges and formula changes still trigger full aggregate rebuilds. Git re-parse only happens for new commits.
 
 ## Non-goals
 - Perfect accuracy on binary files / very large monorepos (v2)
