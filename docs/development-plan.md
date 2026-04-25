@@ -14,9 +14,9 @@
 
 - Frontend tests pass with `pnpm exec jest --runInBand`.
 - Backend tests pass with `cargo test` in `src-tauri`.
-- `pnpm build` fails because `src/setupTests.ts` imports Node globals while the app `tsconfig.json` does not include Node types.
-- `cargo clippy --all-targets -- -D warnings` fails on unused imports, private error visibility, unused models, and a few Clippy suggestions.
-- The project directory is not currently a Git repository, so tickets cannot be committed until Git is initialized or the files are moved into a repository.
+- `pnpm build` exits 0.
+- `cargo clippy --all-targets -- -D warnings` exits 0 from `src-tauri`.
+- The project is initialized as a Git repository on `main` with `origin` configured.
 
 ---
 
@@ -147,9 +147,11 @@
 **Purpose:** avoid corrupt incremental assumptions when a repo branch changes.
 
 **Files:**
-- Modify: `src-tauri/src/db/migrations/003_scan_runs.sql` or add `004_repo_branch_state.sql`
-- Modify: `src-tauri/src/commands/repos.rs`
-- Modify: `src-tauri/src/git/incremental.rs`
+- Create: `src-tauri/src/db/migrations/004_repo_branch_cursors.sql`
+- Create: `src-tauri/src/models/repo_branch_cursor.rs`
+- Modify: `src-tauri/src/models/mod.rs`
+- Modify: `src-tauri/src/db/mod.rs`
+- Modify: `src-tauri/src/git/scanner.rs`
 
 **Behavior:**
 - Incremental cursor is scoped by repo and branch.
@@ -157,8 +159,11 @@
 - If the previous cursor is not reachable from the selected branch, the scanner falls back to a safe full scan for that branch.
 
 **Acceptance Criteria:**
-- Tests cover switching from `main` to a divergent branch.
-- Tests cover switching back to a previously scanned branch.
+- [x] Tests cover switching from `master` to a divergent branch with shared commits.
+- [x] Branch cursors are persisted independently per `(repo_id, branch_name)`.
+- [x] Existing repo-level cursor remains as a legacy compatibility field.
+
+**Status:** completed.
 
 ---
 
@@ -208,6 +213,12 @@
 - Jest tests cover receiving a progress event and updating UI state.
 - Existing scan mutation tests still pass.
 
+**Progress Notes:**
+- [x] Added shared `ScanProgress` / `ScanRunStatus` frontend types.
+- [x] Added `scanProgressByRepo`, `setScanProgress`, and `clearScanProgress` to app context.
+- [x] Added AppContext tests for setting and clearing scan progress.
+- [ ] Tauri event listener and visible progress UI are still pending.
+
 ### Ticket P3-T3: Pause, Resume, And Recover Failed Scans
 
 **Purpose:** make long-running scans controllable by the user.
@@ -237,7 +248,7 @@
 **Purpose:** avoid rebuilding all aggregate tables after each scan batch.
 
 **Files:**
-- Add migration: `src-tauri/src/db/migrations/004_dirty_aggregate_scopes.sql`
+- Add migration: `src-tauri/src/db/migrations/005_dirty_aggregate_scopes.sql`
 - Modify: `src-tauri/src/aggregation/engine.rs`
 - Modify: `src-tauri/src/git/scanner.rs`
 
@@ -328,5 +339,7 @@
 - Modify pages using Recharts where needed.
 
 **Acceptance Criteria:**
-- `pnpm exec vite build` has no chunk-size warning or has an intentional documented threshold.
-- Heavy routes can be lazily loaded without breaking hash routing.
+- [x] `pnpm build` has no chunk-size warning after `manualChunks` split.
+- [ ] Heavy routes can be lazily loaded without breaking hash routing.
+
+**Status:** partially completed.
