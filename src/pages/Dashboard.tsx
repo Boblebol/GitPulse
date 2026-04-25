@@ -2,7 +2,7 @@ import { useAppContext } from "../context/AppContext";
 import { useDeveloperGlobalStats } from "../hooks/useStats";
 import { useTriggerScan } from "../hooks/useRepos";
 import StatCard from "../components/StatCard";
-import { RefreshCw, Flame, GitCommit, Clock } from "lucide-react";
+import { RefreshCw, Flame, GitCommit, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -11,9 +11,45 @@ function fmt(n: number): string {
 }
 
 export default function Dashboard() {
-  const { repoId } = useAppContext();
+  const {
+    repoId,
+    scanProgressByRepo,
+    scanningRepoId,
+    setScanningRepoId,
+    setSyncStatus,
+  } = useAppContext();
   const { data: devStats = [], isLoading } = useDeveloperGlobalStats();
   const scan = useTriggerScan();
+  const scanProgress = repoId ? scanProgressByRepo[repoId] : undefined;
+  const hasScanProgress = scanProgress != null;
+  const isSelectedRepoScanning =
+    repoId != null && (scan.isPending || scanningRepoId === repoId);
+  const syncDisabled = scan.isPending || scanningRepoId !== null;
+  const scanStatusLabel = scanProgress
+    ? scanProgress.status.charAt(0).toUpperCase() + scanProgress.status.slice(1)
+    : "";
+  const scanStatusTone = scanProgress?.status === "failed"
+    ? "bg-error-container text-error"
+    : scanProgress?.status === "completed"
+      ? "bg-tertiary-container text-tertiary"
+      : "bg-surface-container-high text-on-surface";
+
+  const handleSyncRepo = () => {
+    if (!repoId) return;
+
+    setScanningRepoId(repoId);
+    setSyncStatus("Fetching commits…");
+    scan.mutate(repoId, {
+      onSuccess: () => {
+        setScanningRepoId(null);
+        setSyncStatus("");
+      },
+      onError: () => {
+        setScanningRepoId(null);
+        setSyncStatus("");
+      },
+    });
+  };
 
   const totals = devStats.reduce(
     (acc, d) => ({
@@ -56,24 +92,60 @@ export default function Dashboard() {
         </div>
         {repoId && (
           <button
-            onClick={() => scan.mutate(repoId)}
-            disabled={scan.isPending}
+            onClick={handleSyncRepo}
+            disabled={syncDisabled}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-50 transition-opacity"
           >
-            <RefreshCw size={15} className={scan.isPending ? "animate-spin" : ""} />
-            {scan.isPending ? "Scanning…" : "Sync Repo"}
+            <RefreshCw size={15} className={isSelectedRepoScanning ? "animate-spin" : ""} />
+            {isSelectedRepoScanning ? "Scanning…" : "Sync Repo"}
           </button>
         )}
       </div>
 
+      {/* Scan progress */}
+      {scanProgress && (
+        <div
+          className={[
+            "rounded-lg px-4 py-3 text-sm",
+            scanStatusTone,
+          ].join(" ")}
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex min-w-0 items-center gap-2 font-semibold">
+              {scanProgress.status === "failed" ? (
+                <AlertCircle size={16} className="shrink-0" />
+              ) : scanProgress.status === "completed" ? (
+                <CheckCircle2 size={16} className="shrink-0" />
+              ) : (
+                <RefreshCw size={16} className="shrink-0 animate-spin" />
+              )}
+              <span className="truncate">{scanStatusLabel}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
+              <span className="whitespace-nowrap">
+                Commits: <span className="font-semibold">{fmt(scanProgress.commits_indexed)}</span>
+              </span>
+              <span className="whitespace-nowrap">
+                Files: <span className="font-semibold">{fmt(scanProgress.files_processed)}</span>
+              </span>
+            </div>
+            {(scanProgress.error || scanProgress.message) && (
+              <p className="min-w-0 flex-1 basis-full truncate text-xs opacity-80 sm:basis-auto">
+                {scanProgress.error || scanProgress.message}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Scan result / error */}
-      {scan.isSuccess && (
+      {scan.isSuccess && !hasScanProgress && (
         <div className="rounded-lg bg-tertiary-container px-4 py-2 text-tertiary text-sm">
           Scan complete — {scan.data.commits_added} new commits,{" "}
           {scan.data.files_processed} files processed.
         </div>
       )}
-      {scan.isError && (
+      {scan.isError && !hasScanProgress && (
         <div className="rounded-lg bg-error-container px-4 py-2 text-error text-sm">
           Scan failed: {scan.error}
         </div>

@@ -12,12 +12,17 @@ import {
 import { useUpdateFormula } from "../hooks/useStats";
 import { useAppContext } from "../context/AppContext";
 import { Plus, Trash2, RefreshCw, FlaskConical, ChevronDown } from "lucide-react";
+import type { ScanProgress } from "../types";
 
 const DEFAULT_FORMULA =
   "(commits * 10) + (insertions * 0.5) - (deletions * 0.3) + (files_touched * 2) + (streak_bonus * 3)";
 
+function formatScanStatus(status: ScanProgress["status"]) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 export default function Settings() {
-  const { workspaceId, setWorkspaceId, setRepoId, scanningRepoId, setScanningRepoId, syncStatus, setSyncStatus, addNotification } = useAppContext();
+  const { workspaceId, setWorkspaceId, setRepoId, scanningRepoId, setScanningRepoId, syncStatus, setSyncStatus, scanProgressByRepo, addNotification } = useAppContext();
   const { data: workspaces = [] } = useWorkspaces();
   const { data: repos = [] } = useRepos(workspaceId);
   const createWs = useCreateWorkspace();
@@ -198,68 +203,91 @@ export default function Settings() {
             )}
 
             <div className="space-y-1">
-              {repos.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between rounded-lg bg-surface-container px-3 py-2.5"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-on-surface font-medium">{r.name}</span>
-                      <div className="relative w-auto max-w-[150px]">
-                        <select
-                          value={r.active_branch}
-                          onChange={(e) => {
-                            if (e.target.value !== r.active_branch) {
-                              setRepoBranch.mutate({
-                                repoId: r.id,
-                                branch: e.target.value,
-                                workspaceId,
-                              });
-                            }
-                          }}
-                          className="w-full appearance-none bg-surface-container-high text-on-surface text-xs rounded px-2 py-1 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-6 truncate"
-                        >
-                          <option value={r.active_branch}>{r.active_branch}</option>
-                        </select>
-                        <ChevronDown size={12} className="absolute right-1 top-1/2 transform -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+              {repos.map((r) => {
+                const scanProgress = scanProgressByRepo[r.id];
+                const isRepoScanning = scanningRepoId === r.id;
+                const progressMessage = scanProgress?.error || scanProgress?.message;
+
+                return (
+                  <div
+                    key={r.id}
+                    className="flex items-start justify-between gap-3 rounded-lg bg-surface-container px-3 py-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-on-surface font-medium truncate">{r.name}</span>
+                        <div className="relative w-auto max-w-[150px] shrink-0">
+                          <select
+                            value={r.active_branch}
+                            onChange={(e) => {
+                              if (e.target.value !== r.active_branch) {
+                                setRepoBranch.mutate({
+                                  repoId: r.id,
+                                  branch: e.target.value,
+                                  workspaceId,
+                                });
+                              }
+                            }}
+                            className="w-full appearance-none bg-surface-container-high text-on-surface text-xs rounded px-2 py-1 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-6 truncate"
+                          >
+                            <option value={r.active_branch}>{r.active_branch}</option>
+                          </select>
+                          <ChevronDown size={12} className="absolute right-1 top-1/2 transform -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+                        </div>
                       </div>
+                      <span className="text-xs text-on-surface-variant ml-2 font-mono block mt-1 truncate">{r.path}</span>
+                      {isRepoScanning && (scanProgress || syncStatus) && (
+                        <div className="mt-1.5 ml-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant">
+                          {scanProgress ? (
+                            <>
+                              <span className={scanProgress.error ? "font-medium text-error" : "font-medium text-tertiary"}>
+                                {formatScanStatus(scanProgress.status)}
+                              </span>
+                              <span>{scanProgress.commits_indexed} commits</span>
+                              <span>{scanProgress.files_processed} files</span>
+                              {progressMessage && (
+                                <span className={scanProgress.error ? "text-error" : "text-on-surface-variant"}>
+                                  {progressMessage}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-tertiary">{syncStatus}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs text-on-surface-variant ml-2 font-mono block mt-1">{r.path}</span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <button
+                        disabled={triggerScan.isPending || scanningRepoId !== null}
+                        onClick={() => {
+                          console.log("[UI] Sync clicked for repo", r.id);
+                          setScanningRepoId(r.id);
+                          setSyncStatus("Fetching commits…");
+                          triggerScan.mutate(r.id, {
+                            onSuccess: (result) => {
+                              console.log("[UI] Sync success for repo", r.id, result);
+                              addNotification(`${r.name}: ${result.commits_added} commits scanned`, "success");
+                              setScanningRepoId(null);
+                              setSyncStatus("");
+                            },
+                            onError: (error) => {
+                              console.error("[UI] Sync error for repo", r.id, error);
+                              addNotification(`${r.name}: Scan failed`, "error");
+                              setScanningRepoId(null);
+                              setSyncStatus("");
+                            },
+                          });
+                        }}
+                        className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary transition-colors"
+                      >
+                        <RefreshCw size={12} className={isRepoScanning && triggerScan.isPending ? "animate-spin" : ""} />
+                        Sync
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <button
-                      disabled={triggerScan.isPending || scanningRepoId !== null}
-                      onClick={() => {
-                        console.log("[UI] Sync clicked for repo", r.id);
-                        setScanningRepoId(r.id);
-                        setSyncStatus("Fetching commits…");
-                        triggerScan.mutate(r.id, {
-                          onSuccess: (result) => {
-                            console.log("[UI] Sync success for repo", r.id, result);
-                            addNotification(`${r.name}: ${result.commits_added} commits scanned`, "success");
-                            setScanningRepoId(null);
-                            setSyncStatus("");
-                          },
-                          onError: (error) => {
-                            console.error("[UI] Sync error for repo", r.id, error);
-                            addNotification(`${r.name}: Scan failed`, "error");
-                            setScanningRepoId(null);
-                            setSyncStatus("");
-                          },
-                        });
-                      }}
-                      className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary transition-colors"
-                    >
-                      <RefreshCw size={12} className={scanningRepoId === r.id && triggerScan.isPending ? "animate-spin" : ""} />
-                      Sync
-                    </button>
-                    {scanningRepoId === r.id && syncStatus && (
-                      <span className="text-xs text-tertiary">{syncStatus}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

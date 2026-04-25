@@ -10,15 +10,22 @@ import {
   useRemoveRepo,
   useSetRepoBranch,
   useListRepoBranches,
+  useScanProgressEvents,
 } from "../../hooks/useRepos";
 import type { ReactNode } from "react";
+import { AppProvider, useAppContext } from "../../context/AppContext";
 
 // Mock tauri API
 jest.mock("@tauri-apps/api/core", () => ({
   invoke: jest.fn(),
 }));
 
+jest.mock("@tauri-apps/api/event", () => ({
+  listen: jest.fn(),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 describe("useRepos hooks", () => {
   let queryClient: QueryClient;
@@ -36,6 +43,12 @@ describe("useRepos hooks", () => {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       {children}
+    </QueryClientProvider>
+  );
+
+  const appWrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <AppProvider>{children}</AppProvider>
     </QueryClientProvider>
   );
 
@@ -479,6 +492,126 @@ describe("useRepos hooks", () => {
       expect(consoleSpy).toHaveBeenCalledWith("[Scan] onSuccess callback triggered for repo", "repo1");
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe("useScanProgressEvents", () => {
+    type ScanProgressHandler = Parameters<typeof listen>[1];
+
+    function renderScanProgressHook() {
+      return renderHook(
+        () => {
+          useScanProgressEvents();
+          return useAppContext();
+        },
+        { wrapper: appWrapper }
+      );
+    }
+
+    function mockScanProgressListen() {
+      const unlisten = jest.fn();
+      let handler: ScanProgressHandler | undefined;
+
+      (listen as jest.Mock).mockImplementation((_event, callback) => {
+        handler = callback;
+        return Promise.resolve(unlisten);
+      });
+
+      return {
+        emit: async (payload: Parameters<ScanProgressHandler>[0]["payload"]) => {
+          if (!handler) throw new Error("scan_progress listener not registered");
+          await act(async () => {
+            handler({ event: "scan_progress", id: 1, payload });
+          });
+        },
+        unlisten,
+      };
+    }
+
+    it("listens to scan_progress and unlistens on unmount", async () => {
+      const { unlisten } = mockScanProgressListen();
+
+      const { unmount } = renderScanProgressHook();
+
+      await waitFor(() => {
+        expect(listen).toHaveBeenCalledWith("scan_progress", expect.any(Function));
+      });
+
+      unmount();
+
+      await waitFor(() => {
+        expect(unlisten).toHaveBeenCalled();
+      });
+    });
+
+    it("stores running progress and marks the repo as scanning", async () => {
+      const listener = mockScanProgressListen();
+      const { result } = renderScanProgressHook();
+
+      await listener.emit({
+        repo_id: "repo1",
+        scan_run_id: "scan1",
+        status: "running",
+        commits_indexed: 12,
+        files_processed: 4,
+        cursor_sha: "commit-a",
+        target_head_sha: "commit-z",
+        message: "Indexing commits",
+      });
+
+      await waitFor(() => {
+        expect(result.current.scanProgressByRepo.repo1).toMatchObject({
+          repo_id: "repo1",
+          status: "running",
+          commits_indexed: 12,
+          files_processed: 4,
+        });
+        expect(result.current.scanningRepoId).toBe("repo1");
+        expect(result.current.syncStatus).toBe("Indexing commits");
+      });
+    });
+
+    it("clears scan UI state and invalidates stats and repos when completed", async () => {
+      const listener = mockScanProgressListen();
+      const invalidateQuerySpy = jest.spyOn(queryClient, "invalidateQueries");
+      const { result } = renderScanProgressHook();
+
+      await listener.emit({
+        repo_id: "repo1",
+        scan_run_id: "scan1",
+        status: "running",
+        commits_indexed: 12,
+        files_processed: 4,
+        cursor_sha: "commit-a",
+        target_head_sha: "commit-z",
+        message: "Indexing commits",
+      });
+
+      await listener.emit({
+        repo_id: "repo1",
+        scan_run_id: "scan1",
+        status: "completed",
+        commits_indexed: 20,
+        files_processed: 8,
+        cursor_sha: null,
+        last_indexed_commit_sha: "commit-z",
+        target_head_sha: "commit-z",
+        message: "Scan completed",
+      });
+
+      await waitFor(() => {
+        expect(result.current.scanProgressByRepo.repo1).toMatchObject({
+          repo_id: "repo1",
+          status: "completed",
+          commits_indexed: 20,
+          files_processed: 8,
+        });
+        expect(result.current.scanningRepoId).toBeNull();
+        expect(result.current.syncStatus).toBe("");
+      });
+
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["stats"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["repos"] });
     });
   });
 });

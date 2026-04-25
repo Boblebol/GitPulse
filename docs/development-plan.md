@@ -203,6 +203,8 @@
 **Files:**
 - Modify: `src/hooks/useRepos.ts`
 - Modify: `src/context/AppContext.tsx`
+- Add: `src/components/ScanProgressEvents.tsx`
+- Modify: `src/components/Layout.tsx`
 - Modify: `src/pages/Settings.tsx`
 - Modify: `src/pages/Dashboard.tsx`
 - Add tests in: `src/__tests__/hooks/useRepos.test.tsx`
@@ -213,14 +215,17 @@
 - Refresh stats after each completed batch or after scan completion, depending on aggregation ticket status.
 
 **Acceptance Criteria:**
-- Jest tests cover receiving a progress event and updating UI state.
-- Existing scan mutation tests still pass.
+- [x] Jest tests cover receiving a progress event and updating UI state.
+- [x] Existing scan mutation tests still pass.
 
 **Progress Notes:**
 - [x] Added shared `ScanProgress` / `ScanRunStatus` frontend types.
 - [x] Added `scanProgressByRepo`, `setScanProgress`, and `clearScanProgress` to app context.
 - [x] Added AppContext tests for setting and clearing scan progress.
-- [ ] Tauri event listener and visible progress UI are still pending.
+- [x] Mounted the Tauri event listener under the app providers.
+- [x] Added compact progress UI in Settings and Dashboard.
+
+**Status:** completed.
 
 ### Ticket P3-T3: Pause, Resume, And Recover Failed Scans
 
