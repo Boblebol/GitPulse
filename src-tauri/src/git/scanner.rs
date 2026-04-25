@@ -8,6 +8,9 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::models::commit::ChangeType;
+use crate::models::scan::{
+    complete_scan_run, create_scan_run, fail_scan_run, update_scan_run_progress, ScanRunError,
+};
 
 use super::incremental::setup_revwalk;
 use super::rename::upsert_file;
@@ -22,8 +25,32 @@ pub enum GitError {
     Git2(#[from] git2::Error),
     #[error("database error: {0}")]
     Db(#[from] sqlx::Error),
+    #[error("scan run error: {0}")]
+    ScanRun(#[from] ScanRunError),
     #[error("join error: {0}")]
     Join(String),
+    #[cfg(test)]
+    #[error("injected scan failure after {0} batch(es)")]
+    InjectedFailure(usize),
+}
+
+const DEFAULT_SCAN_BATCH_SIZE: usize = 500;
+
+#[derive(Debug, Clone, Copy)]
+struct ScanOptions {
+    batch_size: usize,
+    #[cfg(test)]
+    fail_after_batches: Option<usize>,
+}
+
+impl Default for ScanOptions {
+    fn default() -> Self {
+        Self {
+            batch_size: DEFAULT_SCAN_BATCH_SIZE,
+            #[cfg(test)]
+            fail_after_batches: None,
+        }
+    }
 }
 
 // ── Public result ─────────────────────────────────────────────────────────────
@@ -72,6 +99,16 @@ pub async fn scan_repo(
     repo_path: &Path,
     active_branch: &str,
 ) -> Result<ScanResult, GitError> {
+    scan_repo_with_options(pool, repo_id, repo_path, active_branch, ScanOptions::default()).await
+}
+
+async fn scan_repo_with_options(
+    pool: &SqlitePool,
+    repo_id: &str,
+    repo_path: &Path,
+    active_branch: &str,
+    options: ScanOptions,
+) -> Result<ScanResult, GitError> {
     // Fetch the last indexed SHA to determine incremental range.
     let last_sha: Option<String> = sqlx::query_scalar(
         "SELECT last_indexed_commit_sha FROM repos WHERE id = ?",
@@ -88,36 +125,142 @@ pub async fn scan_repo(
         "starting git scan"
     );
 
-    // ── Phase 1: collect raw commits (sync, on blocking thread pool) ──────────
     let path_owned = repo_path.to_path_buf();
-    let last_sha_clone = last_sha.clone();
     let branch_owned = active_branch.to_string();
+    let target_head_sha = tokio::task::spawn_blocking(move || {
+        resolve_target_head_sha(&path_owned, &branch_owned)
+    })
+    .await
+    .map_err(|e| GitError::Join(e.to_string()))??;
 
-    // For now, we're not streaming progress. Just do the full scan.
-    let raw_commits =
-        tokio::task::spawn_blocking(move || collect_commits(&path_owned, &branch_owned, last_sha_clone.as_deref(), None))
-            .await
-            .map_err(|e| GitError::Join(e.to_string()))??;
+    let scan_run = create_scan_run(pool, repo_id, active_branch, &target_head_sha).await?;
+    let result = scan_repo_batches(
+        pool,
+        repo_id,
+        repo_path,
+        active_branch,
+        last_sha,
+        &scan_run.id,
+        options,
+    )
+    .await;
 
-    let commits_added = raw_commits.len();
-
-    if raw_commits.is_empty() {
-        info!(repo_id, "no new commits to index");
-        return Ok(ScanResult { commits_added: 0, files_processed: 0 });
+    match result {
+        Ok(result) => {
+            complete_scan_run(pool, &scan_run.id).await?;
+            info!(repo_id, commits_added = result.commits_added, files_processed = result.files_processed, "scan complete");
+            Ok(result)
+        }
+        Err(error) => {
+            fail_scan_run(pool, &scan_run.id, &error.to_string()).await?;
+            Err(error)
+        }
     }
+}
 
-    info!(repo_id, commits_added, "persisting commits");
+async fn scan_repo_batches(
+    pool: &SqlitePool,
+    repo_id: &str,
+    repo_path: &Path,
+    active_branch: &str,
+    last_sha: Option<String>,
+    scan_run_id: &str,
+    options: ScanOptions,
+) -> Result<ScanResult, GitError> {
+    let batch_size = options.batch_size.max(1);
+    let mut since_sha = last_sha;
+    let mut commits_added = 0usize;
+    let mut files_processed = 0usize;
+    #[cfg(test)]
+    let mut batches_completed = 0usize;
 
-    // ── Phase 2: persist to DB inside a single transaction ───────────────────
+    loop {
+        let path_owned = repo_path.to_path_buf();
+        let branch_owned = active_branch.to_string();
+        let since_sha_clone = since_sha.clone();
+        let raw_commits = tokio::task::spawn_blocking(move || {
+            collect_commits(
+                &path_owned,
+                &branch_owned,
+                since_sha_clone.as_deref(),
+                Some(batch_size),
+                None,
+            )
+        })
+        .await
+        .map_err(|e| GitError::Join(e.to_string()))??;
+
+        if raw_commits.is_empty() {
+            if commits_added == 0 {
+                info!(repo_id, "no new commits to index");
+            }
+            return Ok(ScanResult {
+                commits_added,
+                files_processed,
+            });
+        }
+
+        info!(
+            repo_id,
+            batch_commits = raw_commits.len(),
+            commits_added,
+            "persisting commit batch"
+        );
+
+        let batch_len = raw_commits.len();
+        let batch = persist_commit_batch(pool, repo_id, &raw_commits).await?;
+        commits_added += batch_len;
+        files_processed += batch.files_processed;
+        since_sha = batch.last_new_sha;
+        #[cfg(test)]
+        {
+            batches_completed += 1;
+        }
+
+        update_scan_run_progress(
+            pool,
+            scan_run_id,
+            since_sha.as_deref(),
+            commits_added as i64,
+            files_processed as i64,
+        )
+        .await?;
+
+        #[cfg(test)]
+        if let Some(limit) = options.fail_after_batches {
+            if batches_completed >= limit {
+                return Err(GitError::InjectedFailure(batches_completed));
+            }
+        }
+
+        if batch_len < batch_size {
+            return Ok(ScanResult {
+                commits_added,
+                files_processed,
+            });
+        }
+    }
+}
+
+struct PersistedBatch {
+    last_new_sha: Option<String>,
+    files_processed: usize,
+}
+
+async fn persist_commit_batch(
+    pool: &SqlitePool,
+    repo_id: &str,
+    raw_commits: &[RawCommit],
+) -> Result<PersistedBatch, GitError> {
     let mut tx = pool.begin().await.map_err(GitError::Db)?;
 
-    // Per-scan caches to avoid redundant DB look-ups.
+    // Per-batch caches to avoid redundant DB look-ups.
     let mut alias_cache: HashMap<(String, String), String> = HashMap::new();
     let mut file_cache: HashMap<String, String> = HashMap::new();
     let mut files_processed = 0usize;
     let mut last_new_sha: Option<String> = None;
 
-    for raw in &raw_commits {
+    for raw in raw_commits {
         files_processed += raw.file_changes.len();
 
         let committed_at = Utc
@@ -204,9 +347,10 @@ pub async fn scan_repo(
 
     tx.commit().await.map_err(GitError::Db)?;
 
-    info!(repo_id, commits_added, files_processed, "scan complete");
-
-    Ok(ScanResult { commits_added, files_processed })
+    Ok(PersistedBatch {
+        last_new_sha,
+        files_processed,
+    })
 }
 
 // ── Sync git2 helpers (run on spawn_blocking) ─────────────────────────────────
@@ -217,6 +361,7 @@ fn collect_commits(
     repo_path: &Path,
     active_branch: &str,
     since_sha: Option<&str>,
+    max_commits: Option<usize>,
     progress_tx: Option<tokio::sync::mpsc::Sender<usize>>,
 ) -> Result<Vec<RawCommit>, GitError> {
     let repo = Repository::open(repo_path).map_err(|_| GitError::NotFound {
@@ -337,6 +482,12 @@ fn collect_commits(
             deletions: total_deletions,
             file_changes,
         });
+
+        if let Some(max_commits) = max_commits {
+            if commits.len() >= max_commits {
+                break;
+            }
+        }
     }
 
     let elapsed = start_time.elapsed();
@@ -347,6 +498,18 @@ fn collect_commits(
     );
 
     Ok(commits)
+}
+
+fn resolve_target_head_sha(repo_path: &Path, active_branch: &str) -> Result<String, GitError> {
+    let repo = Repository::open(repo_path).map_err(|_| GitError::NotFound {
+        path: repo_path.display().to_string(),
+    })?;
+
+    let branch_ref = format!("refs/heads/{active_branch}");
+    match repo.refname_to_id(&branch_ref) {
+        Ok(oid) => Ok(oid.to_string()),
+        Err(_) => Ok(repo.head()?.peel_to_commit()?.id().to_string()),
+    }
 }
 
 /// Create the analysis worktree if it does not already exist.
@@ -681,6 +844,71 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(total, 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn interrupted_batched_scan_persists_completed_batches() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        add_commit(&repo, "c1", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        add_commit(&repo, "c2", "Alice", "alice@example.com", &[("b.txt", "2")]);
+        add_commit(&repo, "c3", "Alice", "alice@example.com", &[("c.txt", "3")]);
+
+        let repo_id = seed_repo_record(&pool, tmp.path()).await;
+
+        let result = scan_repo_with_options(
+            &pool,
+            &repo_id,
+            tmp.path(),
+            "master",
+            ScanOptions {
+                batch_size: 2,
+                fail_after_batches: Some(1),
+            },
+        )
+        .await;
+
+        assert!(result.is_err());
+
+        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM commits WHERE repo_id=?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(total, 2);
+
+        let indexed_sha: String =
+            sqlx::query_scalar("SELECT last_indexed_commit_sha FROM repos WHERE id=?")
+                .bind(&repo_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let (status, commits_indexed, files_processed, cursor_sha): (String, i64, i64, String) =
+            sqlx::query_as(
+                "SELECT status, commits_indexed, files_processed, cursor_sha
+                 FROM scan_runs
+                 WHERE repo_id = ?",
+            )
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(status, "failed");
+        assert_eq!(commits_indexed, 2);
+        assert_eq!(files_processed, 2);
+        assert_eq!(cursor_sha, indexed_sha);
+
+        let indexed_commit_exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM commits WHERE repo_id = ? AND sha = ?)",
+        )
+        .bind(&repo_id)
+        .bind(&indexed_sha)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(indexed_commit_exists);
     }
 
     #[tokio::test(flavor = "multi_thread")]

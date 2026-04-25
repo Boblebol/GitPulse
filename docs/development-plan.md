@@ -130,15 +130,17 @@
 - Re-running after a partial scan continues from durable scan state.
 
 **Steps:**
-- [ ] Write a failing Rust test that simulates two batches and verifies partial progress is persisted.
-- [ ] Refactor `collect_commits` into an iterator-like batch collector.
-- [ ] Persist each batch in a transaction.
-- [ ] Update scan counters after each committed batch.
+- [x] Write a failing Rust test that simulates two batches and verifies partial progress is persisted.
+- [x] Refactor `collect_commits` into an iterator-like batch collector.
+- [x] Persist each batch in a transaction.
+- [x] Update scan counters after each committed batch.
 
 **Acceptance Criteria:**
 - Existing scan tests still pass.
 - New partial-progress test passes.
 - Scanning a repo with no new commits still returns zero without creating duplicate rows.
+
+**Status:** completed.
 
 ### Ticket P2-T3: Make Branch State Explicit
 
