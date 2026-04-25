@@ -8,6 +8,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::models::commit::ChangeType;
+use crate::models::repo_branch_cursor::{fetch_repo_branch_cursor, upsert_repo_branch_cursor};
 use crate::models::scan::{
     complete_scan_run, create_scan_run, fail_scan_run, update_scan_run_progress, ScanRunError,
 };
@@ -99,7 +100,14 @@ pub async fn scan_repo(
     repo_path: &Path,
     active_branch: &str,
 ) -> Result<ScanResult, GitError> {
-    scan_repo_with_options(pool, repo_id, repo_path, active_branch, ScanOptions::default()).await
+    scan_repo_with_options(
+        pool,
+        repo_id,
+        repo_path,
+        active_branch,
+        ScanOptions::default(),
+    )
+    .await
 }
 
 async fn scan_repo_with_options(
@@ -109,29 +117,36 @@ async fn scan_repo_with_options(
     active_branch: &str,
     options: ScanOptions,
 ) -> Result<ScanResult, GitError> {
-    // Fetch the last indexed SHA to determine incremental range.
-    let last_sha: Option<String> = sqlx::query_scalar(
-        "SELECT last_indexed_commit_sha FROM repos WHERE id = ?",
-    )
-    .bind(repo_id)
-    .fetch_one(pool)
-    .await
-    .map_err(GitError::Db)?;
+    // Prefer the branch-specific cursor. The repo-level cursor is kept as a
+    // legacy fallback for databases created before per-branch scan state.
+    let branch_cursor = fetch_repo_branch_cursor(pool, repo_id, active_branch)
+        .await
+        .map_err(GitError::Db)?;
+    let legacy_last_sha: Option<String> =
+        sqlx::query_scalar("SELECT last_indexed_commit_sha FROM repos WHERE id = ?")
+            .bind(repo_id)
+            .fetch_one(pool)
+            .await
+            .map_err(GitError::Db)?;
+    let last_sha = branch_cursor
+        .as_ref()
+        .map(|cursor| cursor.last_indexed_commit_sha.clone())
+        .or(legacy_last_sha);
 
     info!(
         repo_id,
         path = %repo_path.display(),
         last_sha = last_sha.as_deref().unwrap_or("none"),
+        cursor_source = if branch_cursor.is_some() { "branch" } else { "repo_legacy" },
         "starting git scan"
     );
 
     let path_owned = repo_path.to_path_buf();
     let branch_owned = active_branch.to_string();
-    let target_head_sha = tokio::task::spawn_blocking(move || {
-        resolve_target_head_sha(&path_owned, &branch_owned)
-    })
-    .await
-    .map_err(|e| GitError::Join(e.to_string()))??;
+    let target_head_sha =
+        tokio::task::spawn_blocking(move || resolve_target_head_sha(&path_owned, &branch_owned))
+            .await
+            .map_err(|e| GitError::Join(e.to_string()))??;
 
     let scan_run = create_scan_run(pool, repo_id, active_branch, &target_head_sha).await?;
     let result = scan_repo_batches(
@@ -148,7 +163,12 @@ async fn scan_repo_with_options(
     match result {
         Ok(result) => {
             complete_scan_run(pool, &scan_run.id).await?;
-            info!(repo_id, commits_added = result.commits_added, files_processed = result.files_processed, "scan complete");
+            info!(
+                repo_id,
+                commits_added = result.commits_added,
+                files_processed = result.files_processed,
+                "scan complete"
+            );
             Ok(result)
         }
         Err(error) => {
@@ -209,7 +229,7 @@ async fn scan_repo_batches(
 
         let batch_len = raw_commits.len();
         let batch = persist_commit_batch(pool, repo_id, &raw_commits).await?;
-        commits_added += batch_len;
+        commits_added += batch.commits_inserted;
         files_processed += batch.files_processed;
         since_sha = batch.last_new_sha;
         #[cfg(test)]
@@ -225,6 +245,12 @@ async fn scan_repo_batches(
             files_processed as i64,
         )
         .await?;
+
+        if let Some(cursor_sha) = since_sha.as_deref() {
+            upsert_repo_branch_cursor(pool, repo_id, active_branch, cursor_sha, Some(scan_run_id))
+                .await
+                .map_err(GitError::Db)?;
+        }
 
         #[cfg(test)]
         if let Some(limit) = options.fail_after_batches {
@@ -244,6 +270,7 @@ async fn scan_repo_batches(
 
 struct PersistedBatch {
     last_new_sha: Option<String>,
+    commits_inserted: usize,
     files_processed: usize,
 }
 
@@ -257,6 +284,7 @@ async fn persist_commit_batch(
     // Per-batch caches to avoid redundant DB look-ups.
     let mut alias_cache: HashMap<(String, String), String> = HashMap::new();
     let mut file_cache: HashMap<String, String> = HashMap::new();
+    let mut commits_inserted = 0usize;
     let mut files_processed = 0usize;
     let mut last_new_sha: Option<String> = None;
 
@@ -274,8 +302,7 @@ async fn persist_commit_batch(
         let alias_id = match alias_cache.get(&key) {
             Some(id) => id.clone(),
             None => {
-                let id =
-                    upsert_alias(&mut tx, &raw.author_name, &raw.author_email).await?;
+                let id = upsert_alias(&mut tx, &raw.author_name, &raw.author_email).await?;
                 alias_cache.insert(key, id.clone());
                 id
             }
@@ -283,7 +310,7 @@ async fn persist_commit_batch(
 
         // Insert commit (IGNORE = skip if sha already in DB from a previous scan).
         let commit_id = Uuid::new_v4().to_string();
-        sqlx::query(
+        let commit_insert = sqlx::query(
             "INSERT OR IGNORE INTO commits
              (id, repo_id, sha, author_alias_id, message, committed_at,
               insertions, deletions, files_changed)
@@ -301,6 +328,18 @@ async fn persist_commit_batch(
         .execute(&mut *tx)
         .await
         .map_err(GitError::Db)?;
+        let commit_was_inserted = commit_insert.rows_affected() > 0;
+        let persisted_commit_id = if commit_was_inserted {
+            commits_inserted += 1;
+            commit_id
+        } else {
+            sqlx::query_scalar::<_, String>("SELECT id FROM commits WHERE repo_id = ? AND sha = ?")
+                .bind(repo_id)
+                .bind(&raw.sha)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(GitError::Db)?
+        };
 
         // Insert per-file changes.
         for fc in &raw.file_changes {
@@ -322,7 +361,7 @@ async fn persist_commit_batch(
                  VALUES (?, ?, ?, ?, ?, ?)",
             )
             .bind(&change_id)
-            .bind(&commit_id)
+            .bind(&persisted_commit_id)
             .bind(&file_id)
             .bind(fc.change_type.as_str())
             .bind(fc.insertions)
@@ -349,6 +388,7 @@ async fn persist_commit_batch(
 
     Ok(PersistedBatch {
         last_new_sha,
+        commits_inserted,
         files_processed,
     })
 }
@@ -453,14 +493,13 @@ fn collect_commits(
             };
 
             // Per-file line counts from the patch.
-            let (file_ins, file_del) =
-                match git2::Patch::from_diff(&diff, i) {
-                    Ok(Some(patch)) => {
-                        let (_, ins, del) = patch.line_stats().unwrap_or((0, 0, 0));
-                        (ins as i64, del as i64)
-                    }
-                    _ => (0i64, 0i64),
-                };
+            let (file_ins, file_del) = match git2::Patch::from_diff(&diff, i) {
+                Ok(Some(patch)) => {
+                    let (_, ins, del) = patch.line_stats().unwrap_or((0, 0, 0));
+                    (ins as i64, del as i64)
+                }
+                _ => (0i64, 0i64),
+            };
 
             file_changes.push(RawFileChange {
                 old_path,
@@ -595,7 +634,7 @@ mod tests {
     use super::*;
     use crate::db::test_pool;
     use chrono::Utc;
-    use git2::{Repository, Signature};
+    use git2::{build::CheckoutBuilder, Repository, Signature};
     use tempfile::TempDir;
     use uuid::Uuid;
 
@@ -639,6 +678,12 @@ mod tests {
             .commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
             .unwrap();
         oid.to_string()
+    }
+
+    fn checkout_branch(repo: &Repository, branch: &str) {
+        repo.set_head(&format!("refs/heads/{branch}")).unwrap();
+        repo.checkout_head(Some(CheckoutBuilder::new().force()))
+            .unwrap();
     }
 
     // ── DB seed helper ────────────────────────────────────────────────────────
@@ -707,11 +752,25 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        add_commit(&repo, "init", "Alice", "alice@example.com", &[("a.txt", "hello")]);
-        add_commit(&repo, "second", "Alice", "alice@example.com", &[("b.txt", "world")]);
+        add_commit(
+            &repo,
+            "init",
+            "Alice",
+            "alice@example.com",
+            &[("a.txt", "hello")],
+        );
+        add_commit(
+            &repo,
+            "second",
+            "Alice",
+            "alice@example.com",
+            &[("b.txt", "world")],
+        );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        let result = scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        let result = scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         assert_eq!(result.commits_added, 2);
 
@@ -728,10 +787,18 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        add_commit(&repo, "init", "Alice", "alice@example.com", &[("a.txt", "hi")]);
+        add_commit(
+            &repo,
+            "init",
+            "Alice",
+            "alice@example.com",
+            &[("a.txt", "hi")],
+        );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         let dev_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM developers")
             .fetch_one(&pool)
@@ -739,11 +806,10 @@ mod tests {
             .unwrap();
         assert_eq!(dev_count, 1);
 
-        let alias_email: String =
-            sqlx::query_scalar("SELECT git_email FROM aliases LIMIT 1")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let alias_email: String = sqlx::query_scalar("SELECT git_email FROM aliases LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(alias_email, "alice@example.com");
     }
 
@@ -757,7 +823,9 @@ mod tests {
         add_commit(&repo, "c3", "Alice", "alice@example.com", &[("c.txt", "3")]);
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         // Same author across 3 commits → exactly 1 developer + 1 alias.
         let dev_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM developers")
@@ -786,14 +854,15 @@ mod tests {
         );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
-        let file_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE repo_id=?")
-                .bind(&repo_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE repo_id=?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(file_count, 2);
     }
 
@@ -802,10 +871,18 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        let sha = add_commit(&repo, "init", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        let sha = add_commit(
+            &repo,
+            "init",
+            "Alice",
+            "alice@example.com",
+            &[("a.txt", "1")],
+        );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         let indexed_sha: String =
             sqlx::query_scalar("SELECT last_indexed_commit_sha FROM repos WHERE id=?")
@@ -827,14 +904,18 @@ mod tests {
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
 
         // First scan: 2 commits.
-        let r1 = scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        let r1 = scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
         assert_eq!(r1.commits_added, 2);
 
         // Add one more commit.
         add_commit(&repo, "c3", "Alice", "alice@example.com", &[("c.txt", "3")]);
 
         // Second scan: should only pick up the 1 new commit.
-        let r2 = scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        let r2 = scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
         assert_eq!(r2.commits_added, 1);
 
         // Total in DB: 3.
@@ -844,6 +925,101 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(total, 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn full_branch_scan_reuses_existing_shared_commit_records() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+
+        let shared_sha = add_commit(
+            &repo,
+            "shared",
+            "Alice",
+            "alice@example.com",
+            &[("a.txt", "1")],
+        );
+        let shared_commit = repo
+            .find_commit(git2::Oid::from_str(&shared_sha).unwrap())
+            .unwrap();
+        repo.branch("feature", &shared_commit, false).unwrap();
+
+        let master_sha = add_commit(
+            &repo,
+            "master-only",
+            "Alice",
+            "alice@example.com",
+            &[("b.txt", "2")],
+        );
+        checkout_branch(&repo, "feature");
+        let feature_sha = add_commit(
+            &repo,
+            "feature-only",
+            "Alice",
+            "alice@example.com",
+            &[("c.txt", "3")],
+        );
+
+        let repo_id = seed_repo_record(&pool, tmp.path()).await;
+        let master_result = scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
+        assert_eq!(master_result.commits_added, 2);
+
+        // Simulate the first scan for another branch once branch-specific
+        // cursors are introduced: the shared base commit already exists.
+        sqlx::query("UPDATE repos SET last_indexed_commit_sha = NULL WHERE id = ?")
+            .bind(&repo_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let feature_result = scan_repo(&pool, &repo_id, tmp.path(), "feature")
+            .await
+            .unwrap();
+        assert_eq!(feature_result.commits_added, 1);
+
+        let commit_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM commits WHERE repo_id = ?")
+                .bind(&repo_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(commit_count, 3);
+
+        let change_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)
+             FROM commit_file_changes cfc
+             JOIN commits c ON c.id = cfc.commit_id
+             WHERE c.repo_id = ?",
+        )
+        .bind(&repo_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(change_count, 3);
+
+        let master_cursor: String = sqlx::query_scalar(
+            "SELECT last_indexed_commit_sha
+             FROM repo_branch_cursors
+             WHERE repo_id = ? AND branch_name = 'master'",
+        )
+        .bind(&repo_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let feature_cursor: String = sqlx::query_scalar(
+            "SELECT last_indexed_commit_sha
+             FROM repo_branch_cursors
+             WHERE repo_id = ? AND branch_name = 'feature'",
+        )
+        .bind(&repo_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(master_cursor, master_sha);
+        assert_eq!(feature_cursor, feature_sha);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -916,12 +1092,22 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        add_commit(&repo, "init", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        add_commit(
+            &repo,
+            "init",
+            "Alice",
+            "alice@example.com",
+            &[("a.txt", "1")],
+        );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
-        let r2 = scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        let r2 = scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
         assert_eq!(r2.commits_added, 0);
     }
 
@@ -938,47 +1124,58 @@ mod tests {
             "add file",
             "Alice",
             "alice@example.com",
-            &[("old.rs", "fn foo() {}\n// identical content for rename detection")],
+            &[(
+                "old.rs",
+                "fn foo() {}\n// identical content for rename detection",
+            )],
         );
-        rename_commit(&repo, "rename file", "Alice", "alice@example.com", "old.rs", "new.rs");
+        rename_commit(
+            &repo,
+            "rename file",
+            "Alice",
+            "alice@example.com",
+            "old.rs",
+            "new.rs",
+        );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         // Exactly 1 file record (stable canonical ID across the rename).
-        let file_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE repo_id=?")
-                .bind(&repo_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(file_count, 1, "canonical file_id must be stable across rename");
+        let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE repo_id=?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            file_count, 1,
+            "canonical file_id must be stable across rename"
+        );
 
         // file_name_history has one entry.
-        let hist_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM file_name_history")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let hist_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM file_name_history")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(hist_count, 1);
 
         // The history entry records the right paths.
-        let (old_path, new_path): (String, String) = sqlx::query_as(
-            "SELECT old_path, new_path FROM file_name_history LIMIT 1",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let (old_path, new_path): (String, String) =
+            sqlx::query_as("SELECT old_path, new_path FROM file_name_history LIMIT 1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(old_path, "old.rs");
         assert_eq!(new_path, "new.rs");
 
         // The file's current_path is the new name.
-        let current: String =
-            sqlx::query_scalar("SELECT current_path FROM files WHERE repo_id=?")
-                .bind(&repo_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let current: String = sqlx::query_scalar("SELECT current_path FROM files WHERE repo_id=?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(current, "new.rs");
     }
 
@@ -995,40 +1192,54 @@ mod tests {
             "add file",
             "Alice",
             "alice@example.com",
-            &[("old.rs", "fn foo() {}\n// identical content for rename detection")],
+            &[(
+                "old.rs",
+                "fn foo() {}\n// identical content for rename detection",
+            )],
         );
 
         let repo_id = seed_repo_record(&pool, tmp.path()).await;
 
         // Scan 1: indexes "old.rs", cache is discarded after the scan.
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         // Now rename and scan again — cache starts empty for scan 2.
-        rename_commit(&repo, "rename file", "Alice", "alice@example.com", "old.rs", "new.rs");
-        scan_repo(&pool, &repo_id, tmp.path(), "master").await.unwrap();
+        rename_commit(
+            &repo,
+            "rename file",
+            "Alice",
+            "alice@example.com",
+            "old.rs",
+            "new.rs",
+        );
+        scan_repo(&pool, &repo_id, tmp.path(), "master")
+            .await
+            .unwrap();
 
         // Same assertions: 1 file, 1 history entry, correct current_path.
-        let file_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE repo_id=?")
-                .bind(&repo_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(file_count, 1, "canonical file_id must survive an incremental rename");
+        let file_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE repo_id=?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            file_count, 1,
+            "canonical file_id must survive an incremental rename"
+        );
 
-        let hist_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM file_name_history")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let hist_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM file_name_history")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(hist_count, 1);
 
-        let current: String =
-            sqlx::query_scalar("SELECT current_path FROM files WHERE repo_id=?")
-                .bind(&repo_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let current: String = sqlx::query_scalar("SELECT current_path FROM files WHERE repo_id=?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(current, "new.rs");
     }
 }

@@ -19,7 +19,9 @@ pub enum DbError {
 /// Used exclusively in tests.
 #[cfg(test)]
 pub(crate) async fn test_pool() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.expect("in-memory pool");
+    let pool = SqlitePool::connect("sqlite::memory:")
+        .await
+        .expect("in-memory pool");
     migrations::run(&pool).await.expect("test migrations");
     pool
 }
@@ -27,14 +29,12 @@ pub(crate) async fn test_pool() -> SqlitePool {
 /// Open (or create) the SQLite database at `db_path`, apply all pending migrations,
 /// and return a connection pool with the recommended pragmas.
 pub async fn open(db_path: &Path) -> Result<SqlitePool, DbError> {
-    let options = SqliteConnectOptions::from_str(&format!(
-        "sqlite://{}?mode=rwc",
-        db_path.display()
-    ))?
-    .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-    .foreign_keys(true)
-    .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
-    .pragma("cache_size", "-32000"); // 32 MB page cache
+    let options =
+        SqliteConnectOptions::from_str(&format!("sqlite://{}?mode=rwc", db_path.display()))?
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .foreign_keys(true)
+            .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+            .pragma("cache_size", "-32000"); // 32 MB page cache
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -56,12 +56,11 @@ mod tests {
     async fn migrations_create_all_expected_tables() {
         let pool = test_pool().await;
 
-        let tables: Vec<String> = sqlx::query_scalar(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let tables: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
 
         let expected = [
             "aliases",
@@ -72,6 +71,7 @@ mod tests {
             "files",
             "metric_formulas",
             "repos",
+            "repo_branch_cursors",
             "scan_runs",
             "stats_daily_developer",
             "stats_daily_directory",
@@ -133,13 +133,11 @@ mod tests {
         let pool = test_pool().await;
 
         let now = "2024-01-01T00:00:00Z";
-        sqlx::query(
-            "INSERT INTO developers (id, name, created_at) VALUES ('d1', 'Dev', ?)",
-        )
-        .bind(now)
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO developers (id, name, created_at) VALUES ('d1', 'Dev', ?)")
+            .bind(now)
+            .execute(&pool)
+            .await
+            .unwrap();
 
         sqlx::query(
             "INSERT INTO aliases (id, developer_id, git_name, git_email, created_at)
@@ -205,6 +203,122 @@ mod tests {
             .unwrap();
 
         let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM scan_runs")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(remaining, 0);
+    }
+
+    #[tokio::test]
+    async fn migrations_repo_branch_cursors_are_unique_per_repo_branch() {
+        let pool = test_pool().await;
+        let now = "2024-01-01T00:00:00Z";
+
+        sqlx::query("INSERT INTO workspaces (id, name, created_at) VALUES ('ws1', 'WS', ?)")
+            .bind(now)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "INSERT INTO repos (id, workspace_id, name, path, active_branch, created_at)
+             VALUES ('repo1', 'ws1', 'Repo', '/tmp/repo1', 'main', ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO repo_branch_cursors
+             (repo_id, branch_name, last_indexed_commit_sha, last_scan_run_id, updated_at)
+             VALUES ('repo1', 'main', 'sha-a', NULL, ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let result = sqlx::query(
+            "INSERT INTO repo_branch_cursors
+             (repo_id, branch_name, last_indexed_commit_sha, last_scan_run_id, updated_at)
+             VALUES ('repo1', 'main', 'sha-b', NULL, ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await;
+
+        assert!(
+            result.is_err(),
+            "UNIQUE constraint on repo_branch_cursors(repo_id, branch_name) should have been enforced"
+        );
+    }
+
+    #[tokio::test]
+    async fn migrations_repo_branch_cursors_cascade_with_repo_and_null_deleted_scan_run() {
+        let pool = test_pool().await;
+        let now = "2024-01-01T00:00:00Z";
+
+        sqlx::query("INSERT INTO workspaces (id, name, created_at) VALUES ('ws1', 'WS', ?)")
+            .bind(now)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "INSERT INTO repos (id, workspace_id, name, path, active_branch, created_at)
+             VALUES ('repo1', 'ws1', 'Repo', '/tmp/repo1', 'main', ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO scan_runs
+             (id, repo_id, branch, target_head_sha, cursor_sha, status,
+              commits_indexed, files_processed, error_message,
+              started_at, updated_at, completed_at)
+             VALUES ('scan1', 'repo1', 'main', 'head-sha', NULL, 'running',
+                     0, 0, NULL, ?, ?, NULL)",
+        )
+        .bind(now)
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO repo_branch_cursors
+             (repo_id, branch_name, last_indexed_commit_sha, last_scan_run_id, updated_at)
+             VALUES ('repo1', 'main', 'sha-a', 'scan1', ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query("DELETE FROM scan_runs WHERE id = 'scan1'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let scan_run_id: Option<String> = sqlx::query_scalar(
+            "SELECT last_scan_run_id FROM repo_branch_cursors WHERE repo_id = 'repo1' AND branch_name = 'main'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(scan_run_id, None);
+
+        sqlx::query("DELETE FROM repos WHERE id = 'repo1'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM repo_branch_cursors")
             .fetch_one(&pool)
             .await
             .unwrap();
