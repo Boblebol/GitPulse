@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* ── Design tokens — "The Courtside Editorial" ────────────────────────── */
+@theme {
+  /* Surfaces (tonal stacking — no borders rule) */
+  --color-surface:                   #0b1326;
+  --color-surface-container-low:     #131b2e;
+  --color-surface-container:         #1a2236;
+  --color-surface-container-high:    #222a3d;
+  --color-surface-container-highest: #2d3449;
+
+  /* Brand */
+  --color-primary:           #ffb599;
+  --color-primary-container: #f26522;
+  --color-on-primary:        #1a0a00;
+
+  /* Text */
+  --color-on-surface:         #dae2fd;
+  --color-on-surface-variant: #9ba5c0;
+
+  /* Semantic */
+  --color-tertiary:           #4ae176;
+  --color-tertiary-container: #0a3d1a;
+  --color-error:              #ffb4ab;
+  --color-error-container:    #93000a;
+
+  /* Borders (ghost only) */
+  --color-outline-variant: #594138;
+  --color-secondary-container: #1e2a40;
+
+  /* Typography families */
+  --font-display:  "Space Grotesk", sans-serif;
+  --font-body:     "Inter", sans-serif;
+  --font-metrics:  "Public Sans", sans-serif;
+}
+
+/* ── Base reset ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #0b1326;
+  color: #dae2fd;
+  font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar (arena-dark themed) ───────────────────────────────────── */
+::-webkit-scrollbar             { width: 6px; height: 6px; }
+::-webkit-scrollbar-track       { background: #0b1326; }
+::-webkit-scrollbar-thumb       { background: #2d3449; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #ffb599; }
+
+/* ── Gradient utilities ───────────────────────────────────────────────── */
+.gradient-primary {
+  background: linear-gradient(135deg, #ffb599 0%, #f26522 100%);
+}
+.gradient-primary-text {
+  background: linear-gradient(135deg, #ffb599 0%, #f26522 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glassmorphism ────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(34, 42, 61, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Accent bar (box score key performer) ─────────────────────────────── */
+.accent-bar {
+  position: relative;
+}
+.accent-bar::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #ffb599 0%, #f26522 100%);
+  border-radius: 1px;
+}
+
+/* ── Neon glow (charts) ───────────────────────────────────────────────── */
+.glow-tertiary { filter: drop-shadow(0 0 6px #4ae176); }
+.glow-error    { filter: drop-shadow(0 0 6px #ffb4ab); }
+.glow-primary  { filter: drop-shadow(0 0 8px #f26522); }
