@@ -1,6 +1,9 @@
 use std::path::Path;
+use std::sync::Arc;
 
 use sqlx::SqlitePool;
+use tauri::Emitter;
+use tracing::warn;
 
 use crate::models::repo::{Repo, Workspace};
 use crate::AppState;
@@ -282,17 +285,27 @@ pub(crate) async fn inner_remove_repo(pool: &SqlitePool, repo_id: &str) -> Resul
 /// Trigger a git scan for a repository and rebuild all aggregate tables.
 #[tauri::command]
 pub async fn trigger_scan(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     repo_id: String,
 ) -> Result<crate::git::ScanResult, String> {
-    inner_trigger_scan(&state.db, &repo_id)
+    inner_trigger_scan_with_progress(&state.db, &repo_id, Some(scan_progress_emitter(app)))
         .await
         .map_err(|e| e.to_string())
 }
 
+#[cfg(test)]
 pub(crate) async fn inner_trigger_scan(
     pool: &SqlitePool,
     repo_id: &str,
+) -> Result<crate::git::ScanResult, RepoError> {
+    inner_trigger_scan_with_progress(pool, repo_id, None).await
+}
+
+async fn inner_trigger_scan_with_progress(
+    pool: &SqlitePool,
+    repo_id: &str,
+    progress_callback: Option<crate::git::ScanProgressCallback>,
 ) -> Result<crate::git::ScanResult, RepoError> {
     let (path, active_branch): (String, String) =
         sqlx::query_as("SELECT path, active_branch FROM repos WHERE id = ?")
@@ -301,9 +314,28 @@ pub(crate) async fn inner_trigger_scan(
             .await?
             .ok_or_else(|| RepoError::RepoNotFound(repo_id.to_string()))?;
 
-    let result = crate::git::scan_repo(pool, repo_id, Path::new(&path), &active_branch).await?;
+    let result = if let Some(callback) = progress_callback {
+        crate::git::scan_repo_with_progress(
+            pool,
+            repo_id,
+            Path::new(&path),
+            &active_branch,
+            callback,
+        )
+        .await?
+    } else {
+        crate::git::scan_repo(pool, repo_id, Path::new(&path), &active_branch).await?
+    };
     crate::aggregation::recalculate_all(pool).await?;
     Ok(result)
+}
+
+fn scan_progress_emitter(app: tauri::AppHandle) -> crate::git::ScanProgressCallback {
+    Arc::new(move |payload| {
+        if let Err(error) = app.emit(crate::git::SCAN_PROGRESS_EVENT, payload) {
+            warn!(%error, "failed to emit scan progress event");
+        }
+    })
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

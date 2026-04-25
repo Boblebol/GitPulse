@@ -174,6 +174,7 @@
 **Purpose:** let the frontend display data arriving during large scans.
 
 **Files:**
+- Modify: `src-tauri/src/git/mod.rs`
 - Modify: `src-tauri/src/commands/repos.rs`
 - Modify: `src-tauri/src/git/scanner.rs`
 - Modify: `src/types/index.ts`
@@ -189,9 +190,11 @@
 - `message`
 
 **Acceptance Criteria:**
-- Backend test or integration seam verifies progress payload creation.
-- Tauri command no longer accepts an unused `AppHandle`.
-- UI can subscribe to `scan_progress`.
+- [x] Backend test verifies progress payload creation and frontend serialization.
+- [x] Tauri command emits `scan_progress` through a used `AppHandle`.
+- [x] UI has shared TypeScript payload types and can subscribe to `scan_progress`.
+
+**Status:** completed.
 
 ### Ticket P3-T2: Add Frontend Progress UI
 

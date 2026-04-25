@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use git2::{DiffFindOptions, DiffOptions, Repository};
+use serde::Serialize;
 use sqlx::SqlitePool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -10,7 +12,8 @@ use uuid::Uuid;
 use crate::models::commit::ChangeType;
 use crate::models::repo_branch_cursor::{fetch_repo_branch_cursor, upsert_repo_branch_cursor};
 use crate::models::scan::{
-    complete_scan_run, create_scan_run, fail_scan_run, update_scan_run_progress, ScanRunError,
+    complete_scan_run, create_scan_run, fail_scan_run, fetch_scan_run, update_scan_run_progress,
+    ScanRunError, ScanRunStatus,
 };
 
 use super::incremental::setup_revwalk;
@@ -36,6 +39,9 @@ pub enum GitError {
 }
 
 const DEFAULT_SCAN_BATCH_SIZE: usize = 500;
+pub const SCAN_PROGRESS_EVENT: &str = "scan_progress";
+
+pub type ScanProgressCallback = Arc<dyn Fn(ScanProgressPayload) + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, Copy)]
 struct ScanOptions {
@@ -61,6 +67,19 @@ impl Default for ScanOptions {
 pub struct ScanResult {
     pub commits_added: usize,
     pub files_processed: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ScanProgressPayload {
+    pub repo_id: String,
+    pub scan_run_id: String,
+    pub status: ScanRunStatus,
+    pub commits_indexed: i64,
+    pub files_processed: i64,
+    pub cursor_sha: Option<String>,
+    pub target_head_sha: String,
+    pub message: Option<String>,
+    pub error: Option<String>,
 }
 
 // ── Internal transfer types (git2 → DB layer) ─────────────────────────────────
@@ -106,6 +125,25 @@ pub async fn scan_repo(
         repo_path,
         active_branch,
         ScanOptions::default(),
+        None,
+    )
+    .await
+}
+
+pub async fn scan_repo_with_progress(
+    pool: &SqlitePool,
+    repo_id: &str,
+    repo_path: &Path,
+    active_branch: &str,
+    progress_callback: ScanProgressCallback,
+) -> Result<ScanResult, GitError> {
+    scan_repo_with_options(
+        pool,
+        repo_id,
+        repo_path,
+        active_branch,
+        ScanOptions::default(),
+        Some(progress_callback),
     )
     .await
 }
@@ -116,6 +154,7 @@ async fn scan_repo_with_options(
     repo_path: &Path,
     active_branch: &str,
     options: ScanOptions,
+    progress_callback: Option<ScanProgressCallback>,
 ) -> Result<ScanResult, GitError> {
     // Prefer the branch-specific cursor. The repo-level cursor is kept as a
     // legacy fallback for databases created before per-branch scan state.
@@ -149,13 +188,32 @@ async fn scan_repo_with_options(
             .map_err(|e| GitError::Join(e.to_string()))??;
 
     let scan_run = create_scan_run(pool, repo_id, active_branch, &target_head_sha).await?;
+    emit_scan_progress(
+        progress_callback.as_ref(),
+        ScanProgressPayload::new(
+            repo_id,
+            &scan_run.id,
+            ScanRunStatus::Running,
+            0,
+            0,
+            None,
+            &target_head_sha,
+            Some("Scan started".to_string()),
+            None,
+        ),
+    );
+
     let result = scan_repo_batches(
-        pool,
-        repo_id,
-        repo_path,
-        active_branch,
+        ScanBatchContext {
+            pool,
+            repo_id,
+            repo_path,
+            active_branch,
+            scan_run_id: &scan_run.id,
+            target_head_sha: &target_head_sha,
+            progress_callback: progress_callback.as_ref(),
+        },
         last_sha,
-        &scan_run.id,
         options,
     )
     .await;
@@ -163,6 +221,23 @@ async fn scan_repo_with_options(
     match result {
         Ok(result) => {
             complete_scan_run(pool, &scan_run.id).await?;
+            let completed_scan_run = fetch_scan_run(pool, &scan_run.id)
+                .await?
+                .unwrap_or(scan_run);
+            emit_scan_progress(
+                progress_callback.as_ref(),
+                ScanProgressPayload::new(
+                    repo_id,
+                    &completed_scan_run.id,
+                    ScanRunStatus::Completed,
+                    completed_scan_run.commits_indexed,
+                    completed_scan_run.files_processed,
+                    completed_scan_run.cursor_sha,
+                    &target_head_sha,
+                    Some("Scan completed".to_string()),
+                    None,
+                ),
+            );
             info!(
                 repo_id,
                 commits_added = result.commits_added,
@@ -172,21 +247,54 @@ async fn scan_repo_with_options(
             Ok(result)
         }
         Err(error) => {
-            fail_scan_run(pool, &scan_run.id, &error.to_string()).await?;
+            let error_message = error.to_string();
+            fail_scan_run(pool, &scan_run.id, &error_message).await?;
+            let failed_scan_run = fetch_scan_run(pool, &scan_run.id)
+                .await?
+                .unwrap_or(scan_run);
+            emit_scan_progress(
+                progress_callback.as_ref(),
+                ScanProgressPayload::new(
+                    repo_id,
+                    &failed_scan_run.id,
+                    ScanRunStatus::Failed,
+                    failed_scan_run.commits_indexed,
+                    failed_scan_run.files_processed,
+                    failed_scan_run.cursor_sha,
+                    &target_head_sha,
+                    Some("Scan failed".to_string()),
+                    Some(error_message),
+                ),
+            );
             Err(error)
         }
     }
 }
 
+struct ScanBatchContext<'a> {
+    pool: &'a SqlitePool,
+    repo_id: &'a str,
+    repo_path: &'a Path,
+    active_branch: &'a str,
+    scan_run_id: &'a str,
+    target_head_sha: &'a str,
+    progress_callback: Option<&'a ScanProgressCallback>,
+}
+
 async fn scan_repo_batches(
-    pool: &SqlitePool,
-    repo_id: &str,
-    repo_path: &Path,
-    active_branch: &str,
+    context: ScanBatchContext<'_>,
     last_sha: Option<String>,
-    scan_run_id: &str,
     options: ScanOptions,
 ) -> Result<ScanResult, GitError> {
+    let ScanBatchContext {
+        pool,
+        repo_id,
+        repo_path,
+        active_branch,
+        scan_run_id,
+        target_head_sha,
+        progress_callback,
+    } = context;
     let batch_size = options.batch_size.max(1);
     let mut since_sha = last_sha;
     let mut commits_added = 0usize;
@@ -246,6 +354,21 @@ async fn scan_repo_batches(
         )
         .await?;
 
+        emit_scan_progress(
+            progress_callback,
+            ScanProgressPayload::new(
+                repo_id,
+                scan_run_id,
+                ScanRunStatus::Running,
+                commits_added as i64,
+                files_processed as i64,
+                since_sha.clone(),
+                target_head_sha,
+                Some("Scan batch persisted".to_string()),
+                None,
+            ),
+        );
+
         if let Some(cursor_sha) = since_sha.as_deref() {
             upsert_repo_branch_cursor(pool, repo_id, active_branch, cursor_sha, Some(scan_run_id))
                 .await
@@ -265,6 +388,42 @@ async fn scan_repo_batches(
                 files_processed,
             });
         }
+    }
+}
+
+impl ScanProgressPayload {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        repo_id: &str,
+        scan_run_id: &str,
+        status: ScanRunStatus,
+        commits_indexed: i64,
+        files_processed: i64,
+        cursor_sha: Option<String>,
+        target_head_sha: &str,
+        message: Option<String>,
+        error: Option<String>,
+    ) -> Self {
+        Self {
+            repo_id: repo_id.to_string(),
+            scan_run_id: scan_run_id.to_string(),
+            status,
+            commits_indexed,
+            files_processed,
+            cursor_sha,
+            target_head_sha: target_head_sha.to_string(),
+            message,
+            error,
+        }
+    }
+}
+
+fn emit_scan_progress(
+    progress_callback: Option<&ScanProgressCallback>,
+    payload: ScanProgressPayload,
+) {
+    if let Some(callback) = progress_callback {
+        callback(payload);
     }
 }
 
@@ -635,6 +794,7 @@ mod tests {
     use crate::db::test_pool;
     use chrono::Utc;
     use git2::{build::CheckoutBuilder, Repository, Signature};
+    use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
     use uuid::Uuid;
 
@@ -1023,6 +1183,41 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn scan_repo_with_progress_emits_running_and_completed_payloads() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        add_commit(&repo, "c1", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        add_commit(&repo, "c2", "Alice", "alice@example.com", &[("b.txt", "2")]);
+
+        let repo_id = seed_repo_record(&pool, tmp.path()).await;
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let event_sink = Arc::clone(&events);
+        let callback: ScanProgressCallback = Arc::new(move |payload| {
+            event_sink.lock().unwrap().push(payload);
+        });
+
+        let result = scan_repo_with_progress(&pool, &repo_id, tmp.path(), "master", callback)
+            .await
+            .unwrap();
+
+        assert_eq!(result.commits_added, 2);
+        let events = events.lock().unwrap();
+        assert_eq!(events.first().unwrap().status, ScanRunStatus::Running);
+        assert_eq!(events.first().unwrap().commits_indexed, 0);
+        assert_eq!(events.last().unwrap().status, ScanRunStatus::Completed);
+        assert_eq!(events.last().unwrap().commits_indexed, 2);
+        assert_eq!(events.last().unwrap().files_processed, 2);
+        assert_eq!(events.last().unwrap().repo_id, repo_id);
+        assert!(events.last().unwrap().cursor_sha.is_some());
+
+        let serialized = serde_json::to_value(events.last().unwrap()).unwrap();
+        assert_eq!(serialized["status"], "completed");
+        assert_eq!(serialized["scan_run_id"].as_str().unwrap().len(), 36);
+        assert!(serialized["target_head_sha"].as_str().unwrap().len() >= 40);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn interrupted_batched_scan_persists_completed_batches() {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
@@ -1042,6 +1237,7 @@ mod tests {
                 batch_size: 2,
                 fail_after_batches: Some(1),
             },
+            None,
         )
         .await;
 
