@@ -310,6 +310,41 @@ mod tests {
         assert!(rows.is_empty());
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn file_stats_single_file_commit_has_zero_co_touch_score() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        let rid = setup(&tmp, &pool).await;
+
+        let rows = inner_get_file_stats(&pool, &rid).await.unwrap();
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].co_touch_score, 0.0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn file_stats_exposes_positive_co_touch_score_for_files_changed_together() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("a.txt", "1"), ("b.txt", "2")],
+            D1,
+        );
+        let rid = setup(&tmp, &pool).await;
+
+        let rows = inner_get_file_stats(&pool, &rid).await.unwrap();
+
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|row| row.co_touch_score > 0.0));
+    }
+
     // ── directory stats ───────────────────────────────────────────────────────
 
     #[tokio::test(flavor = "multi_thread")]
@@ -335,6 +370,37 @@ mod tests {
         let src_row = rows.iter().find(|r| r.directory_path == "src");
         assert!(src_row.is_some(), "expected a row for 'src' directory");
         assert_eq!(src_row.unwrap().files_touched, 2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn directory_stats_returns_parent_and_child_directories_for_nested_file() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("src/app/main.rs", "fn main(){}")],
+            D1,
+        );
+        let rid = setup(&tmp, &pool).await;
+
+        let rows = inner_get_directory_stats(&pool, &rid).await.unwrap();
+        let paths = rows
+            .iter()
+            .map(|row| row.directory_path.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(
+            paths.contains(&"src"),
+            "expected parent directory: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"src/app"),
+            "expected child directory: {paths:?}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

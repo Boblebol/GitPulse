@@ -675,6 +675,63 @@ mod tests {
         assert_eq!(r2.commits_added, 1, "only the new commit should be scanned");
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn trigger_scan_populates_recursive_directory_and_co_touch_metrics() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let git_repo = init_repo(tmp.path());
+        commit_at(
+            &git_repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[
+                ("src/app/main.rs", "fn main(){}"),
+                ("src/app/lib.rs", "pub fn lib(){}"),
+            ],
+            D1,
+        );
+
+        let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
+        let r = inner_add_repo(
+            &pool,
+            ws.id,
+            tmp.path().to_str().unwrap().into(),
+            "r".into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let result = inner_trigger_scan(&pool, &r.id).await.unwrap();
+        assert_eq!(result.commits_added, 1);
+
+        let directories: Vec<String> = sqlx::query_scalar(
+            "SELECT directory_path
+             FROM stats_directory_global
+             WHERE repo_id = ?
+             ORDER BY directory_path",
+        )
+        .bind(&r.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(directories, vec!["src".to_string(), "src/app".to_string()]);
+
+        let co_touch_scores: Vec<f64> = sqlx::query_scalar(
+            "SELECT sfg.co_touch_score
+             FROM stats_file_global sfg
+             JOIN files f ON f.id = sfg.file_id
+             WHERE f.repo_id = ?
+             ORDER BY f.current_path",
+        )
+        .bind(&r.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(co_touch_scores, vec![1.0, 1.0]);
+    }
+
     #[tokio::test]
     async fn pause_scan_marks_scan_run_paused() {
         let pool = test_pool().await;

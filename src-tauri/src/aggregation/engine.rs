@@ -479,7 +479,7 @@ async fn insert_daily_file_scopes(
     Ok(())
 }
 
-// ── Step 6 — stats_daily_directory (immediate parent) ────────────────────────
+// ── Step 6 — stats_daily_directory (recursive parents) ───────────────────────
 
 async fn insert_daily_directory(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
@@ -538,16 +538,13 @@ async fn insert_daily_directory_rows(
     let mut agg: HashMap<Key, (HashSet<String>, HashSet<String>, i64, i64)> = HashMap::new();
 
     for (repo_id, path, date, commit_id, file_id, ins, del) in rows {
-        let dir = std::path::Path::new(&path)
-            .parent()
-            .and_then(|p| p.to_str())
-            .unwrap_or("")
-            .to_string();
-        let e = agg.entry((repo_id, dir, date)).or_default();
-        e.0.insert(commit_id);
-        e.1.insert(file_id);
-        e.2 += ins;
-        e.3 += del;
+        for dir in directory_paths_for_file(&path) {
+            let e = agg.entry((repo_id.clone(), dir, date.clone())).or_default();
+            e.0.insert(commit_id.clone());
+            e.1.insert(file_id.clone());
+            e.2 += ins;
+            e.3 += del;
+        }
     }
 
     for ((repo_id, dir, date), (commits, files, ins, del)) in agg {
@@ -569,6 +566,19 @@ async fn insert_daily_directory_rows(
     }
 
     Ok(())
+}
+
+fn directory_paths_for_file(path: &str) -> Vec<String> {
+    let mut components: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+    components.pop();
+
+    if components.is_empty() {
+        return vec![String::new()];
+    }
+
+    (1..=components.len())
+        .map(|end| components[..end].join("/"))
+        .collect()
 }
 
 // ── Step 7 — stats_developer_global ──────────────────────────────────────────
@@ -755,6 +765,7 @@ async fn insert_global_file(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Res
     )
     .execute(&mut **tx)
     .await?;
+    update_file_co_touch_scores(tx, None).await?;
     Ok(())
 }
 
@@ -839,6 +850,55 @@ async fn refresh_global_files(
         .execute(&mut **tx)
         .await?;
     }
+    update_file_co_touch_scores(tx, Some(file_ids)).await?;
+    Ok(())
+}
+
+async fn update_file_co_touch_scores(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    file_ids: Option<&[String]>,
+) -> Result<(), AggError> {
+    // Score formula: for each commit touching N distinct files, every file in
+    // that commit gains N - 1. Single-file commits therefore add 0.
+    let update_sql = "WITH commit_sizes AS (
+             SELECT commit_id, COUNT(DISTINCT file_id) AS file_count
+             FROM commit_file_changes
+             GROUP BY commit_id
+         ),
+         file_commits AS (
+             SELECT DISTINCT file_id, commit_id
+             FROM commit_file_changes
+         ),
+         scores AS (
+             SELECT fc.file_id, SUM(cs.file_count - 1) AS score
+             FROM file_commits fc
+             JOIN commit_sizes cs ON cs.commit_id = fc.commit_id
+             GROUP BY fc.file_id
+         )
+         UPDATE stats_file_global
+         SET co_touch_score = COALESCE(
+             (
+                 SELECT CAST(score AS REAL)
+                 FROM scores
+                 WHERE scores.file_id = stats_file_global.file_id
+             ),
+             0.0
+         )";
+
+    match file_ids {
+        Some(file_ids) => {
+            for file_id in file_ids {
+                sqlx::query(&format!("{update_sql} WHERE file_id = ?"))
+                    .bind(file_id)
+                    .execute(&mut **tx)
+                    .await?;
+            }
+        }
+        None => {
+            sqlx::query(update_sql).execute(&mut **tx).await?;
+        }
+    }
+
     Ok(())
 }
 
@@ -1302,6 +1362,103 @@ mod tests {
         assert_eq!(authors, 2);
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn global_file_co_touch_score_stays_zero_for_single_file_commits() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        commit_at(&repo, "c2", "Alice", "a@x.com", &[("a.txt", "2")], D2);
+
+        setup(&pool, &tmp).await;
+
+        let score: f64 = sqlx::query_scalar("SELECT co_touch_score FROM stats_file_global")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(score, 0.0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn global_file_co_touch_score_sums_other_files_per_shared_commit() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("a.txt", "1"), ("b.txt", "1")],
+            D1,
+        );
+        commit_at(
+            &repo,
+            "c2",
+            "Alice",
+            "a@x.com",
+            &[("a.txt", "2"), ("b.txt", "2"), ("c.txt", "2")],
+            D2,
+        );
+
+        setup(&pool, &tmp).await;
+
+        let scores: Vec<(String, f64)> = sqlx::query_as(
+            "SELECT f.current_path, sfg.co_touch_score
+             FROM stats_file_global sfg
+             JOIN files f ON f.id = sfg.file_id
+             ORDER BY f.current_path",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            scores,
+            vec![
+                ("a.txt".to_string(), 3.0),
+                ("b.txt".to_string(), 3.0),
+                ("c.txt".to_string(), 2.0),
+            ]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn scoped_recalculate_refreshes_file_co_touch_score() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        let rid = setup(&pool, &tmp).await;
+
+        commit_at(
+            &repo,
+            "c2",
+            "Alice",
+            "a@x.com",
+            &[("a.txt", "2"), ("b.txt", "2")],
+            D2,
+        );
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "master")
+            .await
+            .unwrap();
+
+        recalculate_repo_dates(&pool, &[(rid, "2024-01-02".to_string())])
+            .await
+            .unwrap();
+
+        let scores: Vec<f64> = sqlx::query_scalar(
+            "SELECT sfg.co_touch_score
+             FROM stats_file_global sfg
+             JOIN files f ON f.id = sfg.file_id
+             ORDER BY f.current_path",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(scores, vec![1.0, 1.0]);
+    }
+
     // ── stats_daily_directory ─────────────────────────────────────────────────
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1325,6 +1482,31 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(dir, "src");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn daily_directory_nested_file_contributes_to_all_ancestor_directories() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("src/a/b.ts", "export const b = 1;")],
+            D1,
+        );
+
+        setup(&pool, &tmp).await;
+
+        let dirs: Vec<String> = sqlx::query_scalar(
+            "SELECT directory_path FROM stats_daily_directory ORDER BY directory_path",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(dirs, vec!["src".to_string(), "src/a".to_string()]);
     }
 
     #[tokio::test(flavor = "multi_thread")]
