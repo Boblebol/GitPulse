@@ -72,6 +72,7 @@ mod tests {
             "files",
             "metric_formulas",
             "repos",
+            "scan_runs",
             "stats_daily_developer",
             "stats_daily_directory",
             "stats_daily_file",
@@ -162,5 +163,52 @@ mod tests {
             result.is_err(),
             "UNIQUE constraint on (git_name, git_email) should have been enforced"
         );
+    }
+
+    #[tokio::test]
+    async fn migrations_scan_runs_cascade_when_repo_is_deleted() {
+        let pool = test_pool().await;
+        let now = "2024-01-01T00:00:00Z";
+
+        sqlx::query("INSERT INTO workspaces (id, name, created_at) VALUES ('ws1', 'WS', ?)")
+            .bind(now)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "INSERT INTO repos (id, workspace_id, name, path, active_branch, created_at)
+             VALUES ('repo1', 'ws1', 'Repo', '/tmp/repo1', 'main', ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO scan_runs
+             (id, repo_id, branch, target_head_sha, cursor_sha, status,
+              commits_indexed, files_processed, error_message,
+              started_at, updated_at, completed_at)
+             VALUES ('scan1', 'repo1', 'main', 'head-sha', NULL, 'running',
+                     0, 0, NULL, ?, ?, NULL)",
+        )
+        .bind(now)
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query("DELETE FROM repos WHERE id = 'repo1'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM scan_runs")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(remaining, 0);
     }
 }

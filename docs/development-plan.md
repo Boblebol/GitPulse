@@ -103,14 +103,16 @@
 - `scan_runs.completed_at`
 
 **Steps:**
-- [ ] Write migration tests proving the table exists and cascades with `repos`.
-- [ ] Add Rust model structs for scan run rows and progress summaries.
-- [ ] Add helper functions to create, update, complete, and fail scan runs.
+- [x] Write migration tests proving the table exists and cascades with `repos`.
+- [x] Add Rust model structs for scan run rows and progress summaries.
+- [x] Add helper functions to create, update, complete, and fail scan runs.
 
 **Acceptance Criteria:**
 - Migration tests pass.
 - Scan-run helpers are covered by Rust unit tests.
 - No UI behavior changes yet.
+
+**Status:** completed.
 
 ### Ticket P2-T2: Process Commits In Batches
 
