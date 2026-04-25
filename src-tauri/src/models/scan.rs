@@ -149,6 +149,27 @@ pub async fn fetch_scan_run(
     row.map(ScanRun::try_from).transpose()
 }
 
+/// Fetch the latest scan run for a repository.
+pub async fn fetch_latest_scan_run_for_repo(
+    pool: &SqlitePool,
+    repo_id: &str,
+) -> Result<Option<ScanRun>, ScanRunError> {
+    let row: Option<ScanRunRow> = sqlx::query_as(
+        "SELECT id, repo_id, branch, target_head_sha, cursor_sha, status,
+                commits_indexed, files_processed, error_message,
+                started_at, updated_at, completed_at
+         FROM scan_runs
+         WHERE repo_id = ?
+         ORDER BY started_at DESC, updated_at DESC, id DESC
+         LIMIT 1",
+    )
+    .bind(repo_id)
+    .fetch_optional(pool)
+    .await?;
+
+    row.map(ScanRun::try_from).transpose()
+}
+
 /// Persist incremental progress for a running scan.
 pub async fn update_scan_run_progress(
     pool: &SqlitePool,
@@ -172,6 +193,28 @@ pub async fn update_scan_run_progress(
     .bind(files_processed)
     .bind(&now)
     .bind(scan_run_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Mark a running scan run as paused.
+pub async fn pause_scan_run(pool: &SqlitePool, scan_run_id: &str) -> Result<(), ScanRunError> {
+    let now = Utc::now().to_rfc3339();
+
+    sqlx::query(
+        "UPDATE scan_runs
+         SET status = ?,
+             error_message = NULL,
+             updated_at = ?,
+             completed_at = NULL
+         WHERE id = ? AND status = ?",
+    )
+    .bind(ScanRunStatus::Paused.as_str())
+    .bind(&now)
+    .bind(scan_run_id)
+    .bind(ScanRunStatus::Running.as_str())
     .execute(pool)
     .await?;
 
@@ -309,5 +352,28 @@ mod tests {
         assert_eq!(failed.status, ScanRunStatus::Failed);
         assert_eq!(failed.error_message.as_deref(), Some("boom"));
         assert!(failed.completed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn pause_scan_run_sets_paused_status_and_latest_repo_status() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let (_, repo_id) = seed_workspace_and_repo(&pool, tmp.path()).await;
+        let run = create_scan_run(&pool, &repo_id, "main", "head-sha")
+            .await
+            .unwrap();
+
+        pause_scan_run(&pool, &run.id).await.unwrap();
+
+        let paused = fetch_scan_run(&pool, &run.id).await.unwrap().unwrap();
+        let latest = fetch_latest_scan_run_for_repo(&pool, &repo_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(paused.status, ScanRunStatus::Paused);
+        assert!(paused.completed_at.is_none());
+        assert_eq!(latest.id, run.id);
+        assert_eq!(latest.status, ScanRunStatus::Paused);
     }
 }

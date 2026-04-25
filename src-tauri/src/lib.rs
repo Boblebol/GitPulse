@@ -64,6 +64,9 @@ pub fn run() {
             commands::repos::set_repo_branch,
             commands::repos::remove_repo,
             commands::repos::trigger_scan,
+            commands::repos::pause_scan,
+            commands::repos::resume_scan,
+            commands::repos::get_scan_status,
             // developers
             commands::developers::list_developers,
             commands::developers::list_unreviewed_developers,

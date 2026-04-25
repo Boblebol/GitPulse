@@ -6,6 +6,7 @@ use tauri::Emitter;
 use tracing::warn;
 
 use crate::models::repo::{Repo, Workspace};
+use crate::models::scan::ScanRun;
 use crate::AppState;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -24,6 +25,8 @@ pub(crate) enum RepoError {
     Db(#[from] sqlx::Error),
     #[error("scan error: {0}")]
     Scan(#[from] crate::git::GitError),
+    #[error("scan run error: {0}")]
+    ScanRun(#[from] crate::models::scan::ScanRunError),
     #[error("aggregation error: {0}")]
     Agg(#[from] crate::aggregation::AggError),
 }
@@ -294,12 +297,77 @@ pub async fn trigger_scan(
         .map_err(|e| e.to_string())
 }
 
+/// Pause a running scan. The scanner observes this between persisted batches.
+#[tauri::command]
+pub async fn pause_scan(
+    state: tauri::State<'_, AppState>,
+    scan_run_id: String,
+) -> Result<(), String> {
+    inner_pause_scan(&state.db, &scan_run_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Resume scanning a repository from its durable branch cursor.
+#[tauri::command]
+pub async fn resume_scan(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+) -> Result<crate::git::ScanResult, String> {
+    inner_resume_scan_with_progress(&state.db, &repo_id, Some(scan_progress_emitter(app)))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Return the latest scan run status for a repository.
+#[tauri::command]
+pub async fn get_scan_status(
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+) -> Result<Option<ScanRun>, String> {
+    inner_get_scan_status(&state.db, &repo_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 pub(crate) async fn inner_trigger_scan(
     pool: &SqlitePool,
     repo_id: &str,
 ) -> Result<crate::git::ScanResult, RepoError> {
     inner_trigger_scan_with_progress(pool, repo_id, None).await
+}
+
+pub(crate) async fn inner_pause_scan(
+    pool: &SqlitePool,
+    scan_run_id: &str,
+) -> Result<(), RepoError> {
+    crate::models::scan::pause_scan_run(pool, scan_run_id).await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) async fn inner_resume_scan(
+    pool: &SqlitePool,
+    repo_id: &str,
+) -> Result<crate::git::ScanResult, RepoError> {
+    inner_resume_scan_with_progress(pool, repo_id, None).await
+}
+
+async fn inner_resume_scan_with_progress(
+    pool: &SqlitePool,
+    repo_id: &str,
+    progress_callback: Option<crate::git::ScanProgressCallback>,
+) -> Result<crate::git::ScanResult, RepoError> {
+    inner_trigger_scan_with_progress(pool, repo_id, progress_callback).await
+}
+
+pub(crate) async fn inner_get_scan_status(
+    pool: &SqlitePool,
+    repo_id: &str,
+) -> Result<Option<ScanRun>, RepoError> {
+    Ok(crate::models::scan::fetch_latest_scan_run_for_repo(pool, repo_id).await?)
 }
 
 async fn inner_trigger_scan_with_progress(
@@ -576,6 +644,93 @@ mod tests {
         commit_at(&git_repo, "c2", "Alice", "a@x.com", &[("b.txt", "2")], D2);
         let r2 = inner_trigger_scan(&pool, &r.id).await.unwrap();
         assert_eq!(r2.commits_added, 1, "only the new commit should be scanned");
+    }
+
+    #[tokio::test]
+    async fn pause_scan_marks_scan_run_paused() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let (_, repo_id) = crate::test_utils::seed_workspace_and_repo(&pool, tmp.path()).await;
+        let run = crate::models::scan::create_scan_run(&pool, &repo_id, "main", "head-sha")
+            .await
+            .unwrap();
+
+        inner_pause_scan(&pool, &run.id).await.unwrap();
+
+        let paused = crate::models::scan::fetch_scan_run(&pool, &run.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(paused.status, crate::models::scan::ScanRunStatus::Paused);
+    }
+
+    #[tokio::test]
+    async fn get_scan_status_returns_latest_repo_scan_run() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let (_, repo_id) = crate::test_utils::seed_workspace_and_repo(&pool, tmp.path()).await;
+        let first = crate::models::scan::create_scan_run(&pool, &repo_id, "main", "head-1")
+            .await
+            .unwrap();
+        crate::models::scan::complete_scan_run(&pool, &first.id)
+            .await
+            .unwrap();
+        let latest = crate::models::scan::create_scan_run(&pool, &repo_id, "main", "head-2")
+            .await
+            .unwrap();
+
+        let status = inner_get_scan_status(&pool, &repo_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(status.id, latest.id);
+        assert_eq!(status.status, crate::models::scan::ScanRunStatus::Running);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn resume_scan_creates_new_run_after_paused_run() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let git_repo = init_repo(tmp.path());
+        commit_at(&git_repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        commit_at(&git_repo, "c2", "Alice", "a@x.com", &[("b.txt", "2")], D2);
+
+        let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
+        let r = inner_add_repo(
+            &pool,
+            ws.id,
+            tmp.path().to_str().unwrap().into(),
+            "r".into(),
+            None,
+        )
+        .await
+        .unwrap();
+        let paused_run =
+            crate::models::scan::create_scan_run(&pool, &r.id, &r.active_branch, "old-head")
+                .await
+                .unwrap();
+        crate::models::scan::pause_scan_run(&pool, &paused_run.id)
+            .await
+            .unwrap();
+
+        let result = inner_resume_scan(&pool, &r.id).await.unwrap();
+
+        assert_eq!(result.commits_added, 2);
+        let runs: Vec<(String, String)> = sqlx::query_as(
+            "SELECT id, status
+             FROM scan_runs
+             WHERE repo_id = ?
+             ORDER BY started_at ASC, id ASC",
+        )
+        .bind(&r.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].0, paused_run.id);
+        assert_eq!(runs[0].1, "paused");
+        assert_eq!(runs[1].1, "completed");
     }
 
     // ── branches ──────────────────────────────────────────────────────────

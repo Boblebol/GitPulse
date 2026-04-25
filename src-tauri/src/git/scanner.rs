@@ -48,6 +48,8 @@ struct ScanOptions {
     batch_size: usize,
     #[cfg(test)]
     fail_after_batches: Option<usize>,
+    #[cfg(test)]
+    pause_after_batches: Option<usize>,
 }
 
 impl Default for ScanOptions {
@@ -56,6 +58,8 @@ impl Default for ScanOptions {
             batch_size: DEFAULT_SCAN_BATCH_SIZE,
             #[cfg(test)]
             fail_after_batches: None,
+            #[cfg(test)]
+            pause_after_batches: None,
         }
     }
 }
@@ -219,7 +223,7 @@ async fn scan_repo_with_options(
     .await;
 
     match result {
-        Ok(result) => {
+        Ok(ScanBatchOutcome::Completed(result)) => {
             complete_scan_run(pool, &scan_run.id).await?;
             let completed_scan_run = fetch_scan_run(pool, &scan_run.id)
                 .await?
@@ -243,6 +247,32 @@ async fn scan_repo_with_options(
                 commits_added = result.commits_added,
                 files_processed = result.files_processed,
                 "scan complete"
+            );
+            Ok(result)
+        }
+        Ok(ScanBatchOutcome::Paused(result)) => {
+            let paused_scan_run = fetch_scan_run(pool, &scan_run.id)
+                .await?
+                .unwrap_or(scan_run);
+            emit_scan_progress(
+                progress_callback.as_ref(),
+                ScanProgressPayload::new(
+                    repo_id,
+                    &paused_scan_run.id,
+                    ScanRunStatus::Paused,
+                    paused_scan_run.commits_indexed,
+                    paused_scan_run.files_processed,
+                    paused_scan_run.cursor_sha,
+                    &target_head_sha,
+                    Some("Scan paused".to_string()),
+                    None,
+                ),
+            );
+            info!(
+                repo_id,
+                commits_added = result.commits_added,
+                files_processed = result.files_processed,
+                "scan paused"
             );
             Ok(result)
         }
@@ -281,11 +311,16 @@ struct ScanBatchContext<'a> {
     progress_callback: Option<&'a ScanProgressCallback>,
 }
 
+enum ScanBatchOutcome {
+    Completed(ScanResult),
+    Paused(ScanResult),
+}
+
 async fn scan_repo_batches(
     context: ScanBatchContext<'_>,
     last_sha: Option<String>,
     options: ScanOptions,
-) -> Result<ScanResult, GitError> {
+) -> Result<ScanBatchOutcome, GitError> {
     let ScanBatchContext {
         pool,
         repo_id,
@@ -322,10 +357,10 @@ async fn scan_repo_batches(
             if commits_added == 0 {
                 info!(repo_id, "no new commits to index");
             }
-            return Ok(ScanResult {
+            return Ok(ScanBatchOutcome::Completed(ScanResult {
                 commits_added,
                 files_processed,
-            });
+            }));
         }
 
         info!(
@@ -376,6 +411,20 @@ async fn scan_repo_batches(
         }
 
         #[cfg(test)]
+        if let Some(limit) = options.pause_after_batches {
+            if batches_completed >= limit {
+                crate::models::scan::pause_scan_run(pool, scan_run_id).await?;
+            }
+        }
+
+        if is_scan_run_paused(pool, scan_run_id).await? {
+            return Ok(ScanBatchOutcome::Paused(ScanResult {
+                commits_added,
+                files_processed,
+            }));
+        }
+
+        #[cfg(test)]
         if let Some(limit) = options.fail_after_batches {
             if batches_completed >= limit {
                 return Err(GitError::InjectedFailure(batches_completed));
@@ -383,12 +432,18 @@ async fn scan_repo_batches(
         }
 
         if batch_len < batch_size {
-            return Ok(ScanResult {
+            return Ok(ScanBatchOutcome::Completed(ScanResult {
                 commits_added,
                 files_processed,
-            });
+            }));
         }
     }
+}
+
+async fn is_scan_run_paused(pool: &SqlitePool, scan_run_id: &str) -> Result<bool, ScanRunError> {
+    Ok(fetch_scan_run(pool, scan_run_id)
+        .await?
+        .is_some_and(|run| run.status == ScanRunStatus::Paused))
 }
 
 impl ScanProgressPayload {
@@ -1236,6 +1291,7 @@ mod tests {
             ScanOptions {
                 batch_size: 2,
                 fail_after_batches: Some(1),
+                pause_after_batches: None,
             },
             None,
         )
@@ -1281,6 +1337,81 @@ mod tests {
         .await
         .unwrap();
         assert!(indexed_commit_exists);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn paused_batched_scan_stops_without_completing_or_failing() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        add_commit(&repo, "c1", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        add_commit(&repo, "c2", "Alice", "alice@example.com", &[("b.txt", "2")]);
+        add_commit(&repo, "c3", "Alice", "alice@example.com", &[("c.txt", "3")]);
+
+        let repo_id = seed_repo_record(&pool, tmp.path()).await;
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let event_sink = Arc::clone(&events);
+        let callback: ScanProgressCallback = Arc::new(move |payload| {
+            event_sink.lock().unwrap().push(payload);
+        });
+
+        let result = scan_repo_with_options(
+            &pool,
+            &repo_id,
+            tmp.path(),
+            "master",
+            ScanOptions {
+                batch_size: 2,
+                fail_after_batches: None,
+                pause_after_batches: Some(1),
+            },
+            Some(callback),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.commits_added, 2);
+
+        let (status, commits_indexed, cursor_sha, completed_at): (
+            String,
+            i64,
+            String,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT status, commits_indexed, cursor_sha, completed_at
+             FROM scan_runs
+             WHERE repo_id = ?",
+        )
+        .bind(&repo_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(status, "paused");
+        assert_eq!(commits_indexed, 2);
+        assert!(completed_at.is_none());
+
+        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM commits WHERE repo_id = ?")
+            .bind(&repo_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(total, 2);
+
+        let branch_cursor: String = sqlx::query_scalar(
+            "SELECT last_indexed_commit_sha
+             FROM repo_branch_cursors
+             WHERE repo_id = ? AND branch_name = 'master'",
+        )
+        .bind(&repo_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(branch_cursor, cursor_sha);
+
+        let events = events.lock().unwrap();
+        assert_eq!(events.last().unwrap().status, ScanRunStatus::Paused);
+        assert_eq!(events.last().unwrap().commits_indexed, 2);
     }
 
     #[tokio::test(flavor = "multi_thread")]
