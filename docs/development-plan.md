@@ -311,8 +311,10 @@
 - Root-level files contribute to `<root>`.
 
 **Acceptance Criteria:**
-- Tests cover nested files contributing to all ancestor directories.
-- Files page can display parent and child directories without double-counting labels.
+- [x] Tests cover nested files contributing to all ancestor directories.
+- [x] Files page can display parent and child directories without double-counting labels.
+
+**Status:** completed.
 
 ### Ticket P5-T2: Co-Touch Score
 
@@ -327,8 +329,10 @@
 - Binary or single-file commits do not inflate coupling.
 
 **Acceptance Criteria:**
-- Tests cover single-file commits, repeated co-touched pairs, and multi-author files.
-- Files page exposes the metric in the file list.
+- [x] Tests cover single-file commits, repeated co-touched pairs, and multi-author files.
+- [x] Files page exposes the metric in the file list.
+
+**Status:** completed.
 
 ---
 

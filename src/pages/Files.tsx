@@ -21,6 +21,27 @@ function basename(path: string): string {
   return path.split("/").pop() ?? path;
 }
 
+function formatScore(value: number): string {
+  return value.toFixed(value >= 10 ? 0 : 1);
+}
+
+function directoryName(path: string): string {
+  if (path === "") {
+    return "root";
+  }
+
+  return basename(path);
+}
+
+function parentDirectoryLabel(path: string): string {
+  if (path === "") {
+    return "Parent: none";
+  }
+
+  const parentPath = path.split("/").slice(0, -1).join("/");
+  return `Parent: ${parentPath || "root"}`;
+}
+
 export default function Files() {
   const { repoId } = useAppContext();
   const { data: files = [], isLoading: loadingFiles } = useFileStats(repoId);
@@ -204,11 +225,18 @@ export default function Files() {
                     −{f.total_deletions.toLocaleString()}
                   </span>
                   <span
+                    className="hidden sm:block text-xs text-on-surface-variant w-14 text-right shrink-0"
+                    title="Co-touch score"
+                    style={{ fontFamily: "Public Sans, sans-serif" }}
+                  >
+                    Co {formatScore(f.co_touch_score)}
+                  </span>
+                  <span
                     className="text-xs text-primary w-16 text-right shrink-0"
                     title="Churn score"
                     style={{ fontFamily: "Public Sans, sans-serif" }}
                   >
-                    ⚡{f.churn_score.toFixed(1)}
+                    ⚡{formatScore(f.churn_score)}
                   </span>
                 </div>
               );
@@ -233,9 +261,13 @@ export default function Files() {
               <div
                 key={d.id}
                 className="bg-surface-container-high rounded-lg px-4 py-3"
+                title={d.directory_path || "root"}
               >
                 <p className="text-sm font-semibold text-on-surface font-mono truncate">
-                  /{d.directory_path || "<root>"}
+                  {directoryName(d.directory_path)}
+                </p>
+                <p className="mt-0.5 text-xs text-on-surface-variant font-mono truncate">
+                  {parentDirectoryLabel(d.directory_path)}
                 </p>
                 <div className="flex gap-4 mt-1">
                   <span
