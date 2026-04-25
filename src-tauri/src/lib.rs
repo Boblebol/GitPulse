@@ -3,6 +3,8 @@ pub mod alias;
 mod commands;
 mod db;
 mod git;
+#[cfg(test)]
+mod large_repo_benchmark;
 pub mod models;
 #[cfg(test)]
 pub(crate) mod test_utils;

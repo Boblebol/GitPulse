@@ -347,8 +347,13 @@
 - Modify: `src-tauri/Cargo.toml`
 
 **Acceptance Criteria:**
-- Benchmark or ignored test can generate thousands of commits and files.
-- Report includes scan duration, peak batch size, and aggregate duration.
+- [x] Benchmark or ignored test can generate thousands of commits and files.
+- [x] Report includes scan duration, peak batch size, and aggregate duration.
+
+**Command:**
+- `cargo test large_repo_benchmark -- --ignored --nocapture`
+
+**Status:** completed.
 
 ### Ticket P6-T2: Bundle And UI Performance
 
@@ -360,6 +365,6 @@
 
 **Acceptance Criteria:**
 - [x] `pnpm build` has no chunk-size warning after `manualChunks` split.
-- [ ] Heavy routes can be lazily loaded without breaking hash routing.
+- [x] Heavy routes can be lazily loaded without breaking hash routing.
 
-**Status:** partially completed.
+**Status:** completed.
