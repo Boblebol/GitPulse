@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -486,6 +486,8 @@ struct PersistedBatch {
     last_new_sha: Option<String>,
     commits_inserted: usize,
     files_processed: usize,
+    #[cfg(test)]
+    dirty_dates: Vec<String>,
 }
 
 async fn persist_commit_batch(
@@ -501,6 +503,7 @@ async fn persist_commit_batch(
     let mut commits_inserted = 0usize;
     let mut files_processed = 0usize;
     let mut last_new_sha: Option<String> = None;
+    let mut dirty_dates: BTreeSet<String> = BTreeSet::new();
 
     for raw in raw_commits {
         files_processed += raw.file_changes.len();
@@ -545,6 +548,7 @@ async fn persist_commit_batch(
         let commit_was_inserted = commit_insert.rows_affected() > 0;
         let persisted_commit_id = if commit_was_inserted {
             commits_inserted += 1;
+            dirty_dates.insert(commit_date(raw.committed_at_secs));
             commit_id
         } else {
             sqlx::query_scalar::<_, String>("SELECT id FROM commits WHERE repo_id = ? AND sha = ?")
@@ -598,13 +602,61 @@ async fn persist_commit_batch(
             .map_err(GitError::Db)?;
     }
 
+    let dirty_dates = dirty_dates.into_iter().collect::<Vec<_>>();
+    mark_dirty_aggregate_scopes(&mut tx, repo_id, &dirty_dates).await?;
+
     tx.commit().await.map_err(GitError::Db)?;
 
     Ok(PersistedBatch {
         last_new_sha,
         commits_inserted,
         files_processed,
+        #[cfg(test)]
+        dirty_dates,
     })
+}
+
+async fn mark_dirty_aggregate_scopes(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    repo_id: &str,
+    dates: &[String],
+) -> Result<(), GitError> {
+    if dates.is_empty() {
+        return Ok(());
+    }
+
+    let now = Utc::now().to_rfc3339();
+    for date in dates {
+        sqlx::query(
+            "INSERT INTO dirty_aggregate_scopes (repo_id, date, created_at, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(repo_id, date) DO UPDATE SET
+                 updated_at = excluded.updated_at",
+        )
+        .bind(repo_id)
+        .bind(date)
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut **tx)
+        .await
+        .map_err(GitError::Db)?;
+    }
+
+    debug!(
+        repo_id,
+        dirty_dates = ?dates,
+        "dirty aggregate scopes marked for persisted scan batch"
+    );
+    Ok(())
+}
+
+fn commit_date(committed_at_secs: i64) -> String {
+    Utc.timestamp_opt(committed_at_secs, 0)
+        .single()
+        .unwrap_or_default()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 // ── Sync git2 helpers (run on spawn_blocking) ─────────────────────────────────
@@ -995,6 +1047,84 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, 2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn persisted_batch_reports_unique_dirty_dates_for_inserted_commits() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        add_commit(&repo, "c1", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        add_commit(&repo, "c2", "Alice", "alice@example.com", &[("b.txt", "2")]);
+
+        let repo_id = seed_repo_record(&pool, tmp.path()).await;
+        let raw_commits =
+            collect_commits(tmp.path(), "master", None, None, None).expect("collect commits");
+
+        let first_batch = persist_commit_batch(&pool, &repo_id, &raw_commits)
+            .await
+            .unwrap();
+        assert_eq!(first_batch.commits_inserted, 2);
+        assert_eq!(first_batch.dirty_dates.len(), 1);
+        assert_eq!(first_batch.dirty_dates[0].len(), 10);
+
+        let replayed_batch = persist_commit_batch(&pool, &repo_id, &raw_commits)
+            .await
+            .unwrap();
+        assert_eq!(replayed_batch.commits_inserted, 0);
+        assert!(replayed_batch.dirty_dates.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn batched_scan_marks_dirty_scopes_for_persisted_commit_dates() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        crate::test_utils::commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "alice@example.com",
+            &[("a.txt", "1")],
+            1_704_067_200,
+        );
+        crate::test_utils::commit_at(
+            &repo,
+            "c2",
+            "Alice",
+            "alice@example.com",
+            &[("b.txt", "2")],
+            1_704_153_600,
+        );
+
+        let repo_id = seed_repo_record(&pool, tmp.path()).await;
+        let result = scan_repo_with_options(
+            &pool,
+            &repo_id,
+            tmp.path(),
+            "master",
+            ScanOptions {
+                batch_size: 1,
+                fail_after_batches: None,
+                pause_after_batches: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.commits_added, 2);
+        let dirty_dates: Vec<String> = sqlx::query_scalar(
+            "SELECT date
+             FROM dirty_aggregate_scopes
+             WHERE repo_id = ?
+             ORDER BY date",
+        )
+        .bind(&repo_id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(dirty_dates, vec!["2024-01-01", "2024-01-02"]);
     }
 
     #[tokio::test(flavor = "multi_thread")]

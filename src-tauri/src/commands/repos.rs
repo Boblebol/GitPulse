@@ -285,7 +285,7 @@ pub(crate) async fn inner_remove_repo(pool: &SqlitePool, repo_id: &str) -> Resul
     Ok(())
 }
 
-/// Trigger a git scan for a repository and rebuild all aggregate tables.
+/// Trigger a git scan for a repository and rebuild dirty aggregate scopes.
 #[tauri::command]
 pub async fn trigger_scan(
     app: tauri::AppHandle,
@@ -394,8 +394,28 @@ async fn inner_trigger_scan_with_progress(
     } else {
         crate::git::scan_repo(pool, repo_id, Path::new(&path), &active_branch).await?
     };
-    crate::aggregation::recalculate_all(pool).await?;
+    recalculate_after_scan(pool).await?;
     Ok(result)
+}
+
+async fn recalculate_after_scan(pool: &SqlitePool) -> Result<(), RepoError> {
+    let dirty_scopes = crate::models::dirty_scope::list_dirty_scopes(pool).await?;
+    if dirty_scopes.is_empty() {
+        return Ok(());
+    }
+
+    let aggregate_scopes = dirty_scopes
+        .iter()
+        .map(|scope| (scope.repo_id.clone(), scope.date.clone()))
+        .collect::<Vec<_>>();
+    crate::aggregation::recalculate_repo_dates(pool, &aggregate_scopes).await?;
+
+    let scope_refs = dirty_scopes
+        .iter()
+        .map(crate::models::dirty_scope::DirtyAggregateScopeRef::from)
+        .collect::<Vec<_>>();
+    crate::models::dirty_scope::clear_dirty_scopes(pool, &scope_refs).await?;
+    Ok(())
 }
 
 fn scan_progress_emitter(app: tauri::AppHandle) -> crate::git::ScanProgressCallback {
@@ -610,6 +630,15 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(global, 1);
+
+        let dirty: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM dirty_aggregate_scopes")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            dirty, 0,
+            "dirty scopes should be cleared after recalculation"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -269,8 +269,10 @@
 - Alias merge and formula changes can still trigger wider recalculation.
 
 **Acceptance Criteria:**
-- Tests verify only dirty repo/date rows are rebuilt after scan batches.
-- Full recalculation remains available as a fallback command/helper.
+- [x] Tests verify only dirty repo/date rows are rebuilt after scan batches.
+- [x] Full recalculation remains available as a fallback command/helper.
+
+**Status:** completed.
 
 ### Ticket P4-T2: Repo-Scoped Aggregate Rebuild
 
@@ -286,8 +288,10 @@
 - Rebuild global stats only for repos/developers/files affected by dirty scopes.
 
 **Acceptance Criteria:**
-- Existing aggregate tests pass.
-- New tests prove unaffected repos keep their aggregate rows unchanged.
+- [x] Existing aggregate tests pass.
+- [x] New tests prove unaffected repos keep their aggregate rows unchanged.
+
+**Status:** completed.
 
 ---
 
