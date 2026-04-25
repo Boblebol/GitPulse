@@ -67,6 +67,7 @@ mod tests {
             "commit_file_changes",
             "commits",
             "developers",
+            "dirty_aggregate_scopes",
             "file_name_history",
             "files",
             "metric_formulas",
@@ -319,6 +320,63 @@ mod tests {
             .unwrap();
 
         let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM repo_branch_cursors")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(remaining, 0);
+    }
+
+    #[tokio::test]
+    async fn migrations_dirty_aggregate_scopes_are_unique_per_repo_date_and_cascade() {
+        let pool = test_pool().await;
+        let now = "2024-01-01T00:00:00Z";
+
+        sqlx::query("INSERT INTO workspaces (id, name, created_at) VALUES ('ws1', 'WS', ?)")
+            .bind(now)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::query(
+            "INSERT INTO repos (id, workspace_id, name, path, active_branch, created_at)
+             VALUES ('repo1', 'ws1', 'Repo', '/tmp/repo1', 'main', ?)",
+        )
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO dirty_aggregate_scopes (repo_id, date, created_at, updated_at)
+             VALUES ('repo1', '2024-03-14', ?, ?)",
+        )
+        .bind(now)
+        .bind(now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let duplicate = sqlx::query(
+            "INSERT INTO dirty_aggregate_scopes (repo_id, date, created_at, updated_at)
+             VALUES ('repo1', '2024-03-14', ?, ?)",
+        )
+        .bind(now)
+        .bind(now)
+        .execute(&pool)
+        .await;
+
+        assert!(
+            duplicate.is_err(),
+            "PRIMARY KEY on dirty_aggregate_scopes(repo_id, date) should have been enforced"
+        );
+
+        sqlx::query("DELETE FROM repos WHERE id = 'repo1'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM dirty_aggregate_scopes")
             .fetch_one(&pool)
             .await
             .unwrap();
