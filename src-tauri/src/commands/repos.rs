@@ -29,18 +29,18 @@ pub(crate) enum RepoError {
 
 /// List all workspaces ordered by name.
 #[tauri::command]
-pub async fn list_workspaces(
-    state: tauri::State<'_, AppState>,
-) -> Result<Vec<Workspace>, String> {
-    inner_list_workspaces(&state.db).await.map_err(|e| e.to_string())
+pub async fn list_workspaces(state: tauri::State<'_, AppState>) -> Result<Vec<Workspace>, String> {
+    inner_list_workspaces(&state.db)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_list_workspaces(pool: &SqlitePool) -> Result<Vec<Workspace>, RepoError> {
-    Ok(sqlx::query_as(
-        "SELECT id, name, created_at FROM workspaces ORDER BY name COLLATE NOCASE",
+    Ok(
+        sqlx::query_as("SELECT id, name, created_at FROM workspaces ORDER BY name COLLATE NOCASE")
+            .fetch_all(pool)
+            .await?,
     )
-    .fetch_all(pool)
-    .await?)
 }
 
 /// Create a new workspace.
@@ -49,7 +49,9 @@ pub async fn create_workspace(
     state: tauri::State<'_, AppState>,
     name: String,
 ) -> Result<Workspace, String> {
-    inner_create_workspace(&state.db, name).await.map_err(|e| e.to_string())
+    inner_create_workspace(&state.db, name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_create_workspace(
@@ -72,7 +74,9 @@ pub async fn delete_workspace(
     state: tauri::State<'_, AppState>,
     workspace_id: String,
 ) -> Result<(), String> {
-    inner_delete_workspace(&state.db, &workspace_id).await.map_err(|e| e.to_string())
+    inner_delete_workspace(&state.db, &workspace_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_delete_workspace(
@@ -98,7 +102,9 @@ pub async fn list_repos(
     state: tauri::State<'_, AppState>,
     workspace_id: String,
 ) -> Result<Vec<Repo>, String> {
-    inner_list_repos(&state.db, &workspace_id).await.map_err(|e| e.to_string())
+    inner_list_repos(&state.db, &workspace_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_list_repos(
@@ -122,8 +128,7 @@ pub async fn list_repo_branches(path: String) -> Result<Vec<String>, String> {
 }
 
 fn inner_list_branches(path: &str) -> Result<Vec<String>, RepoError> {
-    let repo = git2::Repository::open(path)
-        .map_err(|_| RepoError::NotARepo(path.to_string()))?;
+    let repo = git2::Repository::open(path).map_err(|_| RepoError::NotARepo(path.to_string()))?;
 
     let mut branches = Vec::new();
     let branch_iter = repo
@@ -151,7 +156,9 @@ pub async fn add_repo(
     name: String,
     branch: Option<String>,
 ) -> Result<Repo, String> {
-    inner_add_repo(&state.db, workspace_id, path, name, branch).await.map_err(|e| e.to_string())
+    inner_add_repo(&state.db, workspace_id, path, name, branch)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_add_repo(
@@ -169,8 +176,8 @@ pub(crate) async fn inner_add_repo(
         b
     } else {
         // Auto-detect: try current HEAD, then check for "main" or "master"
-        let git_repo = git2::Repository::open(&path)
-            .map_err(|_| RepoError::NotARepo(path.clone()))?;
+        let git_repo =
+            git2::Repository::open(&path).map_err(|_| RepoError::NotARepo(path.clone()))?;
 
         let current_branch = git_repo
             .head()
@@ -254,11 +261,10 @@ pub(crate) async fn inner_set_repo_branch(
 
 /// Remove a repository and all its associated raw + aggregate data (cascade).
 #[tauri::command]
-pub async fn remove_repo(
-    state: tauri::State<'_, AppState>,
-    repo_id: String,
-) -> Result<(), String> {
-    inner_remove_repo(&state.db, &repo_id).await.map_err(|e| e.to_string())
+pub async fn remove_repo(state: tauri::State<'_, AppState>, repo_id: String) -> Result<(), String> {
+    inner_remove_repo(&state.db, &repo_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_remove_repo(pool: &SqlitePool, repo_id: &str) -> Result<(), RepoError> {
@@ -279,20 +285,21 @@ pub async fn trigger_scan(
     state: tauri::State<'_, AppState>,
     repo_id: String,
 ) -> Result<crate::git::ScanResult, String> {
-    inner_trigger_scan(&state.db, &repo_id).await.map_err(|e| e.to_string())
+    inner_trigger_scan(&state.db, &repo_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) async fn inner_trigger_scan(
     pool: &SqlitePool,
     repo_id: &str,
 ) -> Result<crate::git::ScanResult, RepoError> {
-    let (path, active_branch): (String, String) = sqlx::query_as(
-        "SELECT path, active_branch FROM repos WHERE id = ?",
-    )
-    .bind(repo_id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or_else(|| RepoError::RepoNotFound(repo_id.to_string()))?;
+    let (path, active_branch): (String, String) =
+        sqlx::query_as("SELECT path, active_branch FROM repos WHERE id = ?")
+            .bind(repo_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| RepoError::RepoNotFound(repo_id.to_string()))?;
 
     let result = crate::git::scan_repo(pool, repo_id, Path::new(&path), &active_branch).await?;
     crate::aggregation::recalculate_all(pool).await?;
@@ -336,7 +343,9 @@ mod tests {
     #[tokio::test]
     async fn delete_nonexistent_workspace_fails() {
         let pool = test_pool().await;
-        let err = inner_delete_workspace(&pool, "no-such-id").await.unwrap_err();
+        let err = inner_delete_workspace(&pool, "no-such-id")
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("workspace not found"));
     }
 
@@ -410,12 +419,24 @@ mod tests {
 
         let ws1 = inner_create_workspace(&pool, "WS1".into()).await.unwrap();
         let ws2 = inner_create_workspace(&pool, "WS2".into()).await.unwrap();
-        inner_add_repo(&pool, ws1.id.clone(), tmp1.path().to_str().unwrap().into(), "r1".into(), None)
-            .await
-            .unwrap();
-        inner_add_repo(&pool, ws2.id.clone(), tmp2.path().to_str().unwrap().into(), "r2".into(), None)
-            .await
-            .unwrap();
+        inner_add_repo(
+            &pool,
+            ws1.id.clone(),
+            tmp1.path().to_str().unwrap().into(),
+            "r1".into(),
+            None,
+        )
+        .await
+        .unwrap();
+        inner_add_repo(
+            &pool,
+            ws2.id.clone(),
+            tmp2.path().to_str().unwrap().into(),
+            "r2".into(),
+            None,
+        )
+        .await
+        .unwrap();
 
         let repos_ws1 = inner_list_repos(&pool, &ws1.id).await.unwrap();
         let repos_ws2 = inner_list_repos(&pool, &ws2.id).await.unwrap();
@@ -431,9 +452,15 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         init_repo(tmp.path());
         let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
-        let r = inner_add_repo(&pool, ws.id.clone(), tmp.path().to_str().unwrap().into(), "r".into(), None)
-            .await
-            .unwrap();
+        let r = inner_add_repo(
+            &pool,
+            ws.id.clone(),
+            tmp.path().to_str().unwrap().into(),
+            "r".into(),
+            None,
+        )
+        .await
+        .unwrap();
         inner_remove_repo(&pool, &r.id).await.unwrap();
         let all = inner_list_repos(&pool, &ws.id).await.unwrap();
         assert!(all.is_empty());
@@ -471,19 +498,17 @@ mod tests {
         assert_eq!(result.commits_added, 2);
 
         // Daily stats must have been populated.
-        let daily: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let daily: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(daily, 2);
 
         // Global stats must exist.
-        let global: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM stats_developer_global")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let global: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_developer_global")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(global, 1);
     }
 
@@ -502,9 +527,15 @@ mod tests {
         commit_at(&git_repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
 
         let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
-        let r = inner_add_repo(&pool, ws.id, tmp.path().to_str().unwrap().into(), "r".into(), None)
-            .await
-            .unwrap();
+        let r = inner_add_repo(
+            &pool,
+            ws.id,
+            tmp.path().to_str().unwrap().into(),
+            "r".into(),
+            None,
+        )
+        .await
+        .unwrap();
 
         let r1 = inner_trigger_scan(&pool, &r.id).await.unwrap();
         assert_eq!(r1.commits_added, 1);
@@ -529,7 +560,6 @@ mod tests {
         assert!(!branches.is_empty());
         assert!(branches.iter().any(|b| b == "master" || b == "main"));
     }
-
 
     #[tokio::test(flavor = "multi_thread")]
     async fn set_repo_branch_updates_active_branch() {

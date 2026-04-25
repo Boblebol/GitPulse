@@ -38,15 +38,12 @@ pub struct DeveloperWithAliases {
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 /// Return all developers ordered by name, each with their full alias list.
-pub async fn list_developers(
-    pool: &SqlitePool,
-) -> Result<Vec<DeveloperWithAliases>, AliasError> {
-    let developers: Vec<Developer> = sqlx::query_as(
-        "SELECT id, name, created_at FROM developers ORDER BY name COLLATE NOCASE",
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(AliasError::Db)?;
+pub async fn list_developers(pool: &SqlitePool) -> Result<Vec<DeveloperWithAliases>, AliasError> {
+    let developers: Vec<Developer> =
+        sqlx::query_as("SELECT id, name, created_at FROM developers ORDER BY name COLLATE NOCASE")
+            .fetch_all(pool)
+            .await
+            .map_err(AliasError::Db)?;
 
     let aliases: Vec<Alias> = sqlx::query_as(
         "SELECT id, developer_id, git_name, git_email, created_at
@@ -60,7 +57,10 @@ pub async fn list_developers(
     // Group aliases by developer_id in memory.
     let mut by_dev: HashMap<String, Vec<Alias>> = HashMap::new();
     for alias in aliases {
-        by_dev.entry(alias.developer_id.clone()).or_default().push(alias);
+        by_dev
+            .entry(alias.developer_id.clone())
+            .or_default()
+            .push(alias);
     }
 
     let result = developers
@@ -68,8 +68,7 @@ pub async fn list_developers(
         .map(|dev| {
             let dev_aliases = by_dev.remove(&dev.id).unwrap_or_default();
             // Auto-created = only one alias and developer name matches git_name.
-            let is_auto_created =
-                dev_aliases.len() == 1 && dev_aliases[0].git_name == dev.name;
+            let is_auto_created = dev_aliases.len() == 1 && dev_aliases[0].git_name == dev.name;
             DeveloperWithAliases {
                 developer: dev,
                 aliases: dev_aliases,
@@ -82,9 +81,7 @@ pub async fn list_developers(
 }
 
 /// Return only auto-created (unreviewed) developers.
-pub async fn list_unreviewed(
-    pool: &SqlitePool,
-) -> Result<Vec<DeveloperWithAliases>, AliasError> {
+pub async fn list_unreviewed(pool: &SqlitePool) -> Result<Vec<DeveloperWithAliases>, AliasError> {
     let all = list_developers(pool).await?;
     Ok(all.into_iter().filter(|d| d.is_auto_created).collect())
 }
@@ -168,12 +165,11 @@ pub async fn reassign_alias(
         .map_err(AliasError::Db)?;
 
     // Delete the old developer if it is now empty.
-    let remaining: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM aliases WHERE developer_id = ?")
-            .bind(&current_dev_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(AliasError::Db)?;
+    let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM aliases WHERE developer_id = ?")
+        .bind(&current_dev_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(AliasError::Db)?;
 
     if remaining == 0 {
         sqlx::query("DELETE FROM developers WHERE id = ?")
@@ -207,10 +203,7 @@ pub async fn rename_developer(
 }
 
 /// Create a new developer with no aliases (for manual alias assignment).
-pub async fn create_developer(
-    pool: &SqlitePool,
-    name: &str,
-) -> Result<Developer, AliasError> {
+pub async fn create_developer(pool: &SqlitePool, name: &str) -> Result<Developer, AliasError> {
     let developer = Developer::new(name);
 
     sqlx::query("INSERT INTO developers (id, name, created_at) VALUES (?, ?, ?)")
@@ -232,12 +225,11 @@ pub async fn delete_developer_if_empty(
 ) -> Result<bool, AliasError> {
     ensure_developer_exists(pool, developer_id).await?;
 
-    let count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM aliases WHERE developer_id = ?")
-            .bind(developer_id)
-            .fetch_one(pool)
-            .await
-            .map_err(AliasError::Db)?;
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM aliases WHERE developer_id = ?")
+        .bind(developer_id)
+        .fetch_one(pool)
+        .await
+        .map_err(AliasError::Db)?;
 
     if count > 0 {
         return Ok(false);
@@ -258,12 +250,11 @@ pub(crate) async fn ensure_developer_exists(
     pool: &SqlitePool,
     developer_id: &str,
 ) -> Result<(), AliasError> {
-    let exists: bool =
-        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id = ?)")
-            .bind(developer_id)
-            .fetch_one(pool)
-            .await
-            .map_err(AliasError::Db)?;
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id = ?)")
+        .bind(developer_id)
+        .fetch_one(pool)
+        .await
+        .map_err(AliasError::Db)?;
 
     if !exists {
         return Err(AliasError::DeveloperNotFound {
@@ -366,7 +357,9 @@ mod tests {
     async fn is_auto_created_false_after_rename() {
         let pool = test_pool().await;
         let (dev_id, _) = seed(&pool, "Alice", "alice@example.com").await;
-        rename_developer(&pool, &dev_id, "Alice Smith").await.unwrap();
+        rename_developer(&pool, &dev_id, "Alice Smith")
+            .await
+            .unwrap();
 
         let devs = list_developers(&pool).await.unwrap();
         assert!(!devs[0].is_auto_created);
@@ -400,7 +393,9 @@ mod tests {
         let (dev_id, _) = seed(&pool, "Alice", "alice@example.com").await;
         seed(&pool, "Bob", "bob@example.com").await;
 
-        rename_developer(&pool, &dev_id, "Alice Smith").await.unwrap();
+        rename_developer(&pool, &dev_id, "Alice Smith")
+            .await
+            .unwrap();
 
         let unreviewed = list_unreviewed(&pool).await.unwrap();
         assert_eq!(unreviewed.len(), 1);
@@ -417,12 +412,11 @@ mod tests {
 
         merge_developers(&pool, &src_id, &tgt_id).await.unwrap();
 
-        let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM aliases WHERE developer_id=?")
-                .bind(&tgt_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM aliases WHERE developer_id=?")
+            .bind(&tgt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(count, 2);
     }
 
@@ -434,12 +428,11 @@ mod tests {
 
         merge_developers(&pool, &src_id, &tgt_id).await.unwrap();
 
-        let exists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
-                .bind(&src_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
+            .bind(&src_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert!(!exists);
     }
 
@@ -471,12 +464,11 @@ mod tests {
 
         reassign_alias(&pool, &alias_id, &tgt_id).await.unwrap();
 
-        let new_dev: String =
-            sqlx::query_scalar("SELECT developer_id FROM aliases WHERE id=?")
-                .bind(&alias_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let new_dev: String = sqlx::query_scalar("SELECT developer_id FROM aliases WHERE id=?")
+            .bind(&alias_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(new_dev, tgt_id);
     }
 
@@ -488,12 +480,11 @@ mod tests {
 
         reassign_alias(&pool, &alias_id, &tgt_id).await.unwrap();
 
-        let exists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
-                .bind(&src_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
+            .bind(&src_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert!(!exists);
     }
 
@@ -504,12 +495,11 @@ mod tests {
 
         reassign_alias(&pool, &alias_id, &dev_id).await.unwrap();
 
-        let exists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
-                .bind(&dev_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
+            .bind(&dev_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert!(exists);
     }
 
@@ -529,7 +519,9 @@ mod tests {
         let pool = test_pool().await;
         let (dev_id, _) = seed(&pool, "alice", "alice@example.com").await;
 
-        rename_developer(&pool, &dev_id, "Alice Dupont").await.unwrap();
+        rename_developer(&pool, &dev_id, "Alice Dupont")
+            .await
+            .unwrap();
 
         let name: String = sqlx::query_scalar("SELECT name FROM developers WHERE id=?")
             .bind(&dev_id)
@@ -556,12 +548,11 @@ mod tests {
         let deleted = delete_developer_if_empty(&pool, &dev.id).await.unwrap();
         assert!(deleted);
 
-        let exists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
-                .bind(&dev.id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM developers WHERE id=?)")
+            .bind(&dev.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert!(!exists);
     }
 

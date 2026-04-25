@@ -1,6 +1,6 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Developer {
@@ -29,7 +29,11 @@ pub struct Alias {
 }
 
 impl Alias {
-    pub fn new(developer_id: impl Into<String>, git_name: impl Into<String>, git_email: impl Into<String>) -> Self {
+    pub fn new(
+        developer_id: impl Into<String>,
+        git_name: impl Into<String>,
+        git_email: impl Into<String>,
+    ) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             developer_id: developer_id.into(),

@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Workspace {
-    pub id: String,         // UUID as string (SQLite TEXT)
+    pub id: String, // UUID as string (SQLite TEXT)
     pub name: String,
     pub created_at: String, // ISO-8601 UTC
 }
@@ -31,7 +31,11 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn new(workspace_id: impl Into<String>, name: impl Into<String>, path: impl Into<String>) -> Self {
+    pub fn new(
+        workspace_id: impl Into<String>,
+        name: impl Into<String>,
+        path: impl Into<String>,
+    ) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             workspace_id: workspace_id.into(),

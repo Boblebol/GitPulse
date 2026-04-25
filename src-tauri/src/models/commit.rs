@@ -8,7 +8,7 @@ pub struct Commit {
     pub sha: String,
     pub author_alias_id: String,
     pub message: String,
-    pub committed_at: String,   // ISO-8601 UTC
+    pub committed_at: String, // ISO-8601 UTC
     pub insertions: i64,
     pub deletions: i64,
     pub files_changed: i64,
@@ -72,7 +72,7 @@ pub struct CommitFileChange {
     pub id: String,
     pub commit_id: String,
     pub file_id: String,
-    pub change_type: String,  // "A" | "M" | "D" | "R" | "C"
+    pub change_type: String, // "A" | "M" | "D" | "R" | "C"
     pub insertions: i64,
     pub deletions: i64,
 }

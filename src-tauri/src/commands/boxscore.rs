@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
-use crate::aggregation::{evaluate_raw_score, recalculate_all, AggError};
 use crate::aggregation::formulas::FormulaError;
+use crate::aggregation::{evaluate_raw_score, recalculate_all, AggError};
 use crate::models::stats::StatsDailyDeveloper;
 use crate::AppState;
 
@@ -167,7 +167,9 @@ mod tests {
 
     async fn full_setup(tmp: &TempDir, pool: &SqlitePool) -> String {
         let (_, rid) = seed_workspace_and_repo(pool, tmp.path()).await;
-        crate::git::scan_repo(pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
         recalculate_all(pool).await.unwrap();
         rid
     }
@@ -179,7 +181,14 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1"), ("b.txt", "2")], D1);
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("a.txt", "1"), ("b.txt", "2")],
+            D1,
+        );
         let rid = full_setup(&tmp, &pool).await;
 
         let dev_id: String = sqlx::query_scalar("SELECT id FROM developers LIMIT 1")
@@ -286,7 +295,9 @@ mod tests {
                 .unwrap();
 
         // Switch to a formula that is purely commit-count based → equal raw → both at 50th percentile
-        inner_update_formula(&pool, "commits * 1".into()).await.unwrap();
+        inner_update_formula(&pool, "commits * 1".into())
+            .await
+            .unwrap();
 
         let scores_after: Vec<f64> =
             sqlx::query_scalar("SELECT player_score FROM stats_daily_developer ORDER BY date")
@@ -335,6 +346,9 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(original, after, "formula must not change if validation fails");
+        assert_eq!(
+            original, after,
+            "formula must not change if validation fails"
+        );
     }
 }

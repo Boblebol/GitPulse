@@ -29,7 +29,10 @@ pub fn evaluate_raw_score(
     ctx.set_value("insertions".to_string(), Value::Int(insertions))?;
     ctx.set_value("deletions".to_string(), Value::Int(deletions))?;
     ctx.set_value("files_touched".to_string(), Value::Int(files_touched))?;
-    ctx.set_value("streak_bonus".to_string(), Value::Int(if streak >= 3 { 1 } else { 0 }))?;
+    ctx.set_value(
+        "streak_bonus".to_string(),
+        Value::Int(if streak >= 3 { 1 } else { 0 }),
+    )?;
 
     Ok(eval_number_with_context(formula, &ctx)?)
 }
@@ -118,9 +121,7 @@ mod tests {
             ("b".to_string(), 20.0),
             ("c".to_string(), 30.0),
         ];
-        let pct: std::collections::HashMap<_, _> = percentile_scores(&raw)
-            .into_iter()
-            .collect();
+        let pct: std::collections::HashMap<_, _> = percentile_scores(&raw).into_iter().collect();
 
         assert!((pct["a"] - 100.0 / 3.0).abs() < 1e-6, "a={}", pct["a"]);
         assert!((pct["b"] - 200.0 / 3.0).abs() < 1e-6, "b={}", pct["b"]);
@@ -134,9 +135,7 @@ mod tests {
             ("b".to_string(), 10.0),
             ("c".to_string(), 20.0),
         ];
-        let pct: std::collections::HashMap<_, _> = percentile_scores(&raw)
-            .into_iter()
-            .collect();
+        let pct: std::collections::HashMap<_, _> = percentile_scores(&raw).into_iter().collect();
 
         // Both a and b have rank 2 (2 scores ≤ 10), so percentile = 2/3 * 100
         assert!((pct["a"] - pct["b"]).abs() < 1e-9, "ties must be equal");

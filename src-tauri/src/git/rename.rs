@@ -27,14 +27,13 @@ pub async fn upsert_file(
         let file_id = if let Some(id) = cache.get(old).cloned() {
             id
         } else {
-            let row: Option<String> = sqlx::query_scalar(
-                "SELECT id FROM files WHERE repo_id = ? AND current_path = ?",
-            )
-            .bind(repo_id)
-            .bind(old)
-            .fetch_optional(&mut **tx)
-            .await
-            .map_err(GitError::Db)?;
+            let row: Option<String> =
+                sqlx::query_scalar("SELECT id FROM files WHERE repo_id = ? AND current_path = ?")
+                    .bind(repo_id)
+                    .bind(old)
+                    .fetch_optional(&mut **tx)
+                    .await
+                    .map_err(GitError::Db)?;
 
             match row {
                 Some(id) => id,

@@ -14,7 +14,7 @@ pub fn setup_revwalk<'repo>(
     // fall back to HEAD.
     let branch_ref = format!("refs/heads/{}", active_branch);
     match walk.push_ref(&branch_ref) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(_) => {
             // Fallback to HEAD if the branch ref doesn't exist
             walk.push_head()?;

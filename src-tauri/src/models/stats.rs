@@ -5,7 +5,7 @@ pub struct StatsDailyDeveloper {
     pub id: String,
     pub developer_id: String,
     pub repo_id: String,
-    pub date: String,           // YYYY-MM-DD
+    pub date: String, // YYYY-MM-DD
     pub commits: i64,
     pub insertions: i64,
     pub deletions: i64,

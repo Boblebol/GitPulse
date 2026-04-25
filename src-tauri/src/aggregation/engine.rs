@@ -46,9 +46,7 @@ pub async fn recalculate_all(pool: &SqlitePool) -> Result<(), AggError> {
 
 // ── Step 1 — wipe ─────────────────────────────────────────────────────────────
 
-async fn clear_aggregates(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-) -> Result<(), AggError> {
+async fn clear_aggregates(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Result<(), AggError> {
     for table in &[
         "stats_daily_developer",
         "stats_daily_file",
@@ -113,9 +111,7 @@ async fn insert_daily_developer(
 
 // ── Step 3 — streaks ──────────────────────────────────────────────────────────
 
-async fn update_streaks(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-) -> Result<(), AggError> {
+async fn update_streaks(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Result<(), AggError> {
     // Gap-and-islands technique:
     // Subtract the row-number from the date to get a stable "island" key.
     // Rows on consecutive days share the same island_start; gaps break it.
@@ -159,9 +155,7 @@ async fn update_streaks(
 
 // ── Step 4 — top file per (developer, repo, date) ─────────────────────────────
 
-async fn update_top_file(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-) -> Result<(), AggError> {
+async fn update_top_file(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Result<(), AggError> {
     sqlx::query(
         "WITH touch_counts AS (
              SELECT a.developer_id, c.repo_id,
@@ -197,9 +191,7 @@ async fn update_top_file(
 
 // ── Step 5 — stats_daily_file ─────────────────────────────────────────────────
 
-async fn insert_daily_file(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-) -> Result<(), AggError> {
+async fn insert_daily_file(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Result<(), AggError> {
     sqlx::query(
         "INSERT INTO stats_daily_file
              (id, file_id, date, commits, insertions, deletions, churn_score)
@@ -332,9 +324,7 @@ async fn insert_global_developer(
 
 // ── Step 8 — stats_file_global ────────────────────────────────────────────────
 
-async fn insert_global_file(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-) -> Result<(), AggError> {
+async fn insert_global_file(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>) -> Result<(), AggError> {
     sqlx::query(
         "INSERT INTO stats_file_global
              (id, file_id,
@@ -422,7 +412,10 @@ async fn update_player_scores(pool: &SqlitePool) -> Result<(), AggError> {
     let mut raw_by_dev: HashMap<String, Vec<(String, f64)>> = HashMap::new();
     for (id, dev_id, commits, ins, del, files, streak) in &rows {
         let raw = evaluate_raw_score(&formula, *commits, *ins, *del, *files, *streak)?;
-        raw_by_dev.entry(dev_id.clone()).or_default().push((id.clone(), raw));
+        raw_by_dev
+            .entry(dev_id.clone())
+            .or_default()
+            .push((id.clone(), raw));
     }
 
     // Convert raw → percentile and persist.
@@ -494,21 +487,34 @@ mod tests {
         let ws = Uuid::new_v4().to_string();
         let rid = Uuid::new_v4().to_string();
         sqlx::query("INSERT INTO workspaces (id,name,created_at) VALUES(?,?,?)")
-            .bind(&ws).bind("ws").bind(&now).execute(pool).await.unwrap();
+            .bind(&ws)
+            .bind("ws")
+            .bind(&now)
+            .execute(pool)
+            .await
+            .unwrap();
         sqlx::query(
             "INSERT INTO repos (id,workspace_id,name,path,active_branch,created_at)
              VALUES(?,?,?,?,?,?)",
         )
-        .bind(&rid).bind(&ws).bind("r")
-        .bind(path.to_str().unwrap()).bind("master").bind(&now)
-        .execute(pool).await.unwrap();
+        .bind(&rid)
+        .bind(&ws)
+        .bind("r")
+        .bind(path.to_str().unwrap())
+        .bind("master")
+        .bind(&now)
+        .execute(pool)
+        .await
+        .unwrap();
         rid
     }
 
     /// Scan + recalculate helper.
     async fn setup(pool: &SqlitePool, tmp: &TempDir) -> String {
         let rid = seed_repo_record(pool, tmp.path()).await;
-        crate::git::scan_repo(pool, &rid, tmp.path(), "master").await.unwrap();
+        crate::git::scan_repo(pool, &rid, tmp.path(), "master")
+            .await
+            .unwrap();
         recalculate_all(pool).await.unwrap();
         rid
     }
@@ -531,7 +537,9 @@ mod tests {
         recalculate_all(&pool).await.unwrap();
 
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
-            .fetch_one(&pool).await.unwrap();
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(n, 0);
     }
 
@@ -548,7 +556,9 @@ mod tests {
         setup(&pool, &tmp).await;
 
         let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
-            .fetch_one(&pool).await.unwrap();
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(rows, 2);
     }
 
@@ -563,9 +573,10 @@ mod tests {
 
         setup(&pool, &tmp).await;
 
-        let commits: i64 =
-            sqlx::query_scalar("SELECT commits FROM stats_daily_developer LIMIT 1")
-                .fetch_one(&pool).await.unwrap();
+        let commits: i64 = sqlx::query_scalar("SELECT commits FROM stats_daily_developer LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(commits, 2);
     }
 
@@ -575,7 +586,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
         commit_at(
-            &repo, "c1", "Alice", "a@x.com",
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
             &[("a.txt", "1"), ("b.txt", "2")],
             D1,
         );
@@ -584,7 +598,9 @@ mod tests {
 
         let files: i64 =
             sqlx::query_scalar("SELECT files_touched FROM stats_daily_developer LIMIT 1")
-                .fetch_one(&pool).await.unwrap();
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(files, 2);
     }
 
@@ -603,7 +619,9 @@ mod tests {
 
         let streaks: Vec<i64> =
             sqlx::query_scalar("SELECT streak FROM stats_daily_developer ORDER BY date")
-                .fetch_all(&pool).await.unwrap();
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(streaks, vec![1, 2, 3]);
     }
 
@@ -621,7 +639,9 @@ mod tests {
 
         let streaks: Vec<i64> =
             sqlx::query_scalar("SELECT streak FROM stats_daily_developer ORDER BY date")
-                .fetch_all(&pool).await.unwrap();
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         // D1=1, D2=2, D5=1 (new island after gap)
         assert_eq!(streaks, vec![1, 2, 1]);
     }
@@ -638,10 +658,11 @@ mod tests {
 
         setup(&pool, &tmp).await;
 
-        let (total_commits, active_days): (i64, i64) = sqlx::query_as(
-            "SELECT total_commits, active_days FROM stats_developer_global",
-        )
-        .fetch_one(&pool).await.unwrap();
+        let (total_commits, active_days): (i64, i64) =
+            sqlx::query_as("SELECT total_commits, active_days FROM stats_developer_global")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(total_commits, 2);
         assert_eq!(active_days, 2);
@@ -659,9 +680,10 @@ mod tests {
 
         setup(&pool, &tmp).await;
 
-        let longest: i64 =
-            sqlx::query_scalar("SELECT longest_streak FROM stats_developer_global")
-                .fetch_one(&pool).await.unwrap();
+        let longest: i64 = sqlx::query_scalar("SELECT longest_streak FROM stats_developer_global")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(longest, 3);
     }
 
@@ -672,12 +694,21 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        commit_at(&repo, "c1", "Alice", "a@x.com", &[("x.rs", "fn x(){}"), ("y.rs", "fn y(){}")], D1);
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("x.rs", "fn x(){}"), ("y.rs", "fn y(){}")],
+            D1,
+        );
 
         setup(&pool, &tmp).await;
 
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_file")
-            .fetch_one(&pool).await.unwrap();
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(n, 2);
     }
 
@@ -689,13 +720,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("z.rs", "v1")], D1);
-        commit_at(&repo, "c2", "Bob",   "b@x.com", &[("z.rs", "v2")], D2);
+        commit_at(&repo, "c2", "Bob", "b@x.com", &[("z.rs", "v2")], D2);
 
         setup(&pool, &tmp).await;
 
-        let authors: i64 =
-            sqlx::query_scalar("SELECT unique_authors FROM stats_file_global")
-                .fetch_one(&pool).await.unwrap();
+        let authors: i64 = sqlx::query_scalar("SELECT unique_authors FROM stats_file_global")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(authors, 2);
     }
 
@@ -706,13 +738,21 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        commit_at(&repo, "c1", "Alice", "a@x.com", &[("src/main.rs", "fn main(){}")], D1);
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("src/main.rs", "fn main(){}")],
+            D1,
+        );
 
         setup(&pool, &tmp).await;
 
-        let dir: String =
-            sqlx::query_scalar("SELECT directory_path FROM stats_daily_directory")
-                .fetch_one(&pool).await.unwrap();
+        let dir: String = sqlx::query_scalar("SELECT directory_path FROM stats_daily_directory")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(dir, "src");
     }
 
@@ -725,9 +765,10 @@ mod tests {
 
         setup(&pool, &tmp).await;
 
-        let dir: String =
-            sqlx::query_scalar("SELECT directory_path FROM stats_daily_directory")
-                .fetch_one(&pool).await.unwrap();
+        let dir: String = sqlx::query_scalar("SELECT directory_path FROM stats_daily_directory")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(dir, "");
     }
 
@@ -742,9 +783,10 @@ mod tests {
 
         setup(&pool, &tmp).await;
 
-        let score: f64 =
-            sqlx::query_scalar("SELECT player_score FROM stats_daily_developer")
-                .fetch_one(&pool).await.unwrap();
+        let score: f64 = sqlx::query_scalar("SELECT player_score FROM stats_daily_developer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         // Single row → 100th percentile
         assert!((score - 100.0).abs() < 1e-9, "got {score}");
     }
@@ -764,10 +806,17 @@ mod tests {
 
         let scores: Vec<f64> =
             sqlx::query_scalar("SELECT player_score FROM stats_daily_developer ORDER BY date")
-                .fetch_all(&pool).await.unwrap();
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(scores.len(), 2);
         // Day 2 (more commits) must be at a higher percentile than Day 1.
-        assert!(scores[1] > scores[0], "day2={} day1={}", scores[1], scores[0]);
+        assert!(
+            scores[1] > scores[0],
+            "day2={} day1={}",
+            scores[1],
+            scores[0]
+        );
     }
 
     // ── alias merge → recalculate ─────────────────────────────────────────────
@@ -778,37 +827,60 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
         // Two authors on different days.
-        commit_at(&repo, "c1", "alice",    "alice@work.com",     &[("a.txt","1")], D1);
-        commit_at(&repo, "c2", "Alice W.", "alice@personal.com", &[("b.txt","2")], D2);
+        commit_at(
+            &repo,
+            "c1",
+            "alice",
+            "alice@work.com",
+            &[("a.txt", "1")],
+            D1,
+        );
+        commit_at(
+            &repo,
+            "c2",
+            "Alice W.",
+            "alice@personal.com",
+            &[("b.txt", "2")],
+            D2,
+        );
 
         let rid = seed_repo_record(&pool, tmp.path()).await;
-        crate::git::scan_repo(&pool, &rid, tmp.path(), "master").await.unwrap();
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "master")
+            .await
+            .unwrap();
 
         // Before merge: 2 separate developers.
         let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM developers")
-            .fetch_one(&pool).await.unwrap();
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(before, 2);
 
         // Merge alice@personal.com's developer into alice@work.com's developer.
-        let src_id: String =
-            sqlx::query_scalar(
-                "SELECT a.developer_id FROM aliases a WHERE a.git_email='alice@personal.com'",
-            )
-            .fetch_one(&pool).await.unwrap();
-        let tgt_id: String =
-            sqlx::query_scalar(
-                "SELECT a.developer_id FROM aliases a WHERE a.git_email='alice@work.com'",
-            )
-            .fetch_one(&pool).await.unwrap();
+        let src_id: String = sqlx::query_scalar(
+            "SELECT a.developer_id FROM aliases a WHERE a.git_email='alice@personal.com'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let tgt_id: String = sqlx::query_scalar(
+            "SELECT a.developer_id FROM aliases a WHERE a.git_email='alice@work.com'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
-        crate::alias::merge_developers(&pool, &src_id, &tgt_id).await.unwrap();
+        crate::alias::merge_developers(&pool, &src_id, &tgt_id)
+            .await
+            .unwrap();
         recalculate_all(&pool).await.unwrap();
 
         // After merge + recalc: 1 developer with combined stats.
-        let global: (i64, i64) = sqlx::query_as(
-            "SELECT total_commits, active_days FROM stats_developer_global",
-        )
-        .fetch_one(&pool).await.unwrap();
+        let global: (i64, i64) =
+            sqlx::query_as("SELECT total_commits, active_days FROM stats_developer_global")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(global.0, 2, "combined commits");
         assert_eq!(global.1, 2, "combined active days");
     }

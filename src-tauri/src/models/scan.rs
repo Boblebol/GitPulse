@@ -179,10 +179,7 @@ pub async fn update_scan_run_progress(
 }
 
 /// Mark a scan run as completed.
-pub async fn complete_scan_run(
-    pool: &SqlitePool,
-    scan_run_id: &str,
-) -> Result<(), ScanRunError> {
+pub async fn complete_scan_run(pool: &SqlitePool, scan_run_id: &str) -> Result<(), ScanRunError> {
     let now = Utc::now().to_rfc3339();
 
     sqlx::query(
@@ -242,7 +239,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let (_, repo_id) = seed_workspace_and_repo(&pool, tmp.path()).await;
 
-        let run = create_scan_run(&pool, &repo_id, "main", "head-sha").await.unwrap();
+        let run = create_scan_run(&pool, &repo_id, "main", "head-sha")
+            .await
+            .unwrap();
 
         assert_eq!(run.repo_id, repo_id);
         assert_eq!(run.branch, "main");
@@ -260,7 +259,9 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let (_, repo_id) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        let run = create_scan_run(&pool, &repo_id, "main", "head-sha").await.unwrap();
+        let run = create_scan_run(&pool, &repo_id, "main", "head-sha")
+            .await
+            .unwrap();
 
         update_scan_run_progress(&pool, &run.id, Some("cursor-sha"), 12, 34)
             .await
@@ -279,7 +280,9 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let (_, repo_id) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        let run = create_scan_run(&pool, &repo_id, "main", "head-sha").await.unwrap();
+        let run = create_scan_run(&pool, &repo_id, "main", "head-sha")
+            .await
+            .unwrap();
 
         complete_scan_run(&pool, &run.id).await.unwrap();
 
@@ -295,7 +298,9 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let (_, repo_id) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        let run = create_scan_run(&pool, &repo_id, "main", "head-sha").await.unwrap();
+        let run = create_scan_run(&pool, &repo_id, "main", "head-sha")
+            .await
+            .unwrap();
 
         fail_scan_run(&pool, &run.id, "boom").await.unwrap();
 

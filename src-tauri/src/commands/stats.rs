@@ -193,7 +193,9 @@ mod tests {
     /// Full scan + recalc helper; returns repo_id.
     async fn setup(tmp: &TempDir, pool: &SqlitePool) -> String {
         let (_, rid) = seed_workspace_and_repo(pool, tmp.path()).await;
-        crate::git::scan_repo(pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
         recalculate_all(pool).await.unwrap();
         rid
     }
@@ -224,7 +226,7 @@ mod tests {
         // Bob: 1 commit, Alice: 2 commits → Alice should come first
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "v1")], D1);
         commit_at(&repo, "c2", "Alice", "a@x.com", &[("a.txt", "v2")], D2);
-        commit_at(&repo, "c3", "Bob",   "b@x.com", &[("b.txt", "1")],  D3);
+        commit_at(&repo, "c3", "Bob", "b@x.com", &[("b.txt", "1")], D3);
         setup(&tmp, &pool).await;
 
         let rows = inner_get_developer_global_stats(&pool).await.unwrap();
@@ -280,7 +282,14 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        commit_at(&repo, "c1", "Alice", "a@x.com", &[("src/main.rs", "fn main(){}")], D1);
+        commit_at(
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[("src/main.rs", "fn main(){}")],
+            D1,
+        );
         let rid = setup(&tmp, &pool).await;
 
         let rows = inner_get_file_stats(&pool, &rid).await.unwrap();
@@ -309,8 +318,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
         commit_at(
-            &repo, "c1", "Alice", "a@x.com",
-            &[("src/lib.rs", "pub fn lib(){}"), ("src/main.rs", "fn main(){}")],
+            &repo,
+            "c1",
+            "Alice",
+            "a@x.com",
+            &[
+                ("src/lib.rs", "pub fn lib(){}"),
+                ("src/main.rs", "fn main(){}"),
+            ],
             D1,
         );
         let rid = setup(&tmp, &pool).await;
@@ -330,7 +345,9 @@ mod tests {
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.rs", "1")], D1);
         setup(&tmp, &pool).await;
 
-        let rows = inner_get_directory_stats(&pool, "no-such-repo").await.unwrap();
+        let rows = inner_get_directory_stats(&pool, "no-such-repo")
+            .await
+            .unwrap();
         assert!(rows.is_empty());
     }
 }

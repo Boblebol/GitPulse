@@ -1,8 +1,6 @@
 use sqlx::SqlitePool;
 
-use crate::alias::{
-    self, AliasError, DeveloperWithAliases,
-};
+use crate::alias::{self, AliasError, DeveloperWithAliases};
 use crate::AppState;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -114,7 +112,9 @@ mod tests {
         let repo = init_repo(tmp.path());
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
         let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        crate::git::scan_repo(&pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
 
         let devs = alias::list_developers(&pool).await.unwrap();
         assert_eq!(devs.len(), 1);
@@ -128,12 +128,16 @@ mod tests {
         let repo = init_repo(tmp.path());
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
         let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        crate::git::scan_repo(&pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
 
         let devs = alias::list_developers(&pool).await.unwrap();
         let dev_id = &devs[0].developer.id;
 
-        alias::rename_developer(&pool, dev_id, "Alicia").await.unwrap();
+        alias::rename_developer(&pool, dev_id, "Alicia")
+            .await
+            .unwrap();
         let devs = alias::list_developers(&pool).await.unwrap();
         assert_eq!(devs[0].developer.name, "Alicia");
     }
@@ -145,14 +149,18 @@ mod tests {
         let repo = init_repo(tmp.path());
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
         let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        crate::git::scan_repo(&pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
 
         let unreviewed = alias::list_unreviewed(&pool).await.unwrap();
         assert_eq!(unreviewed.len(), 1, "alice is auto-created");
 
         // After rename, it's no longer considered auto-created
         let dev_id = &unreviewed[0].developer.id.clone();
-        alias::rename_developer(&pool, dev_id, "Alice Renamed").await.unwrap();
+        alias::rename_developer(&pool, dev_id, "Alice Renamed")
+            .await
+            .unwrap();
         let unreviewed2 = alias::list_unreviewed(&pool).await.unwrap();
         assert!(unreviewed2.is_empty(), "renamed → not auto-created anymore");
     }
@@ -164,17 +172,39 @@ mod tests {
         let pool = test_pool().await;
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
-        commit_at(&repo, "c1", "alice",    "alice@work.com",     &[("a.txt", "1")], D1);
-        commit_at(&repo, "c2", "Alice W.", "alice@personal.com", &[("b.txt", "2")], D2);
+        commit_at(
+            &repo,
+            "c1",
+            "alice",
+            "alice@work.com",
+            &[("a.txt", "1")],
+            D1,
+        );
+        commit_at(
+            &repo,
+            "c2",
+            "Alice W.",
+            "alice@personal.com",
+            &[("b.txt", "2")],
+            D2,
+        );
 
         let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        crate::git::scan_repo(&pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
 
         let devs = alias::list_developers(&pool).await.unwrap();
         assert_eq!(devs.len(), 2, "two separate authors before merge");
 
-        let src = devs.iter().find(|d| d.aliases[0].git_email == "alice@personal.com").unwrap();
-        let tgt = devs.iter().find(|d| d.aliases[0].git_email == "alice@work.com").unwrap();
+        let src = devs
+            .iter()
+            .find(|d| d.aliases[0].git_email == "alice@personal.com")
+            .unwrap();
+        let tgt = devs
+            .iter()
+            .find(|d| d.aliases[0].git_email == "alice@work.com")
+            .unwrap();
 
         inner_merge_developers(&pool, src.developer.id.clone(), tgt.developer.id.clone())
             .await
@@ -199,15 +229,17 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo(tmp.path());
         commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
-        commit_at(&repo, "c2", "Bob",   "b@x.com", &[("b.txt", "2")], D2);
+        commit_at(&repo, "c2", "Bob", "b@x.com", &[("b.txt", "2")], D2);
 
         let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
-        crate::git::scan_repo(&pool, &rid, tmp.path(), "main").await.unwrap();
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
         crate::aggregation::recalculate_all(&pool).await.unwrap();
 
         let devs = alias::list_developers(&pool).await.unwrap();
         let alice = devs.iter().find(|d| d.developer.name == "Alice").unwrap();
-        let bob   = devs.iter().find(|d| d.developer.name == "Bob").unwrap();
+        let bob = devs.iter().find(|d| d.developer.name == "Bob").unwrap();
         let bob_alias_id = bob.aliases[0].id.clone();
 
         // Reassign Bob's alias to Alice → Bob's developer should be deleted
