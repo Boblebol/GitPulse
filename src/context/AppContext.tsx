@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { ScanProgress } from "../types";
 
 interface Notification {
   id: string;
@@ -15,6 +16,9 @@ interface AppContextValue {
   setScanningRepoId: (id: string | null) => void;
   syncStatus: string;
   setSyncStatus: (status: string) => void;
+  scanProgressByRepo: Record<string, ScanProgress>;
+  setScanProgress: (progress: ScanProgress) => void;
+  clearScanProgress: (repoId: string) => void;
   notifications: Notification[];
   addNotification: (message: string, type: "success" | "error") => void;
   removeNotification: (id: string) => void;
@@ -27,7 +31,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [repoId, setRepoId] = useState<string | null>(null);
   const [scanningRepoId, setScanningRepoId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string>("");
+  const [scanProgressByRepo, setScanProgressByRepo] = useState<Record<string, ScanProgress>>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const setScanProgress = (progress: ScanProgress) => {
+    setScanProgressByRepo((prev) => ({
+      ...prev,
+      [progress.repo_id]: progress,
+    }));
+  };
+
+  const clearScanProgress = (repoId: string) => {
+    setScanProgressByRepo((prev) => {
+      const next = { ...prev };
+      delete next[repoId];
+      return next;
+    });
+  };
 
   const addNotification = (message: string, type: "success" | "error") => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -45,7 +65,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ workspaceId, repoId, setWorkspaceId, setRepoId, scanningRepoId, setScanningRepoId, syncStatus, setSyncStatus, notifications, addNotification, removeNotification }}>
+    <AppContext.Provider
+      value={{
+        workspaceId,
+        repoId,
+        setWorkspaceId,
+        setRepoId,
+        scanningRepoId,
+        setScanningRepoId,
+        syncStatus,
+        setSyncStatus,
+        scanProgressByRepo,
+        setScanProgress,
+        clearScanProgress,
+        notifications,
+        addNotification,
+        removeNotification,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

@@ -21,6 +21,21 @@ export interface ScanResult {
   files_processed: number;
 }
 
+export type ScanRunStatus = "running" | "paused" | "completed" | "failed";
+
+export interface ScanProgress {
+  repo_id: string;
+  scan_run_id: string;
+  status: ScanRunStatus;
+  commits_indexed: number;
+  files_processed: number;
+  cursor_sha: string | null;
+  last_indexed_commit_sha?: string | null;
+  target_head_sha: string;
+  message?: string;
+  error?: string;
+}
+
 // ── Developers & Aliases ──────────────────────────────────────────────────────
 
 export interface Developer {

@@ -27,7 +27,9 @@ describe("AppContext", () => {
     expect(screen.getByTestId("scanning-repo-id")).toHaveTextContent("none");
   });
 
-  it("allows adding notifications", () => {
+  it("allows adding notifications", async () => {
+    const user = userEvent.setup();
+
     render(
       <AppProvider>
         <TestComponent />
@@ -35,7 +37,7 @@ describe("AppContext", () => {
     );
 
     const button = screen.getByRole("button", { name: "Add Notification" });
-    button.click();
+    await user.click(button);
 
     // Notification should be added (would need Toast component to verify rendering)
     expect(button).toBeInTheDocument();
@@ -193,6 +195,66 @@ describe("AppContext", () => {
     await user.click(screen.getByRole("button", { name: "Update Status" }));
     await waitFor(() => {
       expect(screen.getByTestId("sync-status")).toHaveTextContent("Scanning...");
+    });
+  });
+
+  it("stores and clears scan progress by repository", async () => {
+    const user = userEvent.setup();
+
+    function ScanProgressComponent() {
+      const { scanProgressByRepo, setScanProgress, clearScanProgress } = useAppContext();
+      const progress = scanProgressByRepo.repo123;
+
+      return (
+        <div>
+          <div data-testid="scan-progress-status">{progress?.status ?? "none"}</div>
+          <div data-testid="scan-progress-commits">
+            {progress?.commits_indexed ?? "none"}
+          </div>
+          <div data-testid="scan-progress-cursor">
+            {progress?.cursor_sha ?? "none"}
+          </div>
+          <button
+            onClick={() =>
+              setScanProgress({
+                repo_id: "repo123",
+                scan_run_id: "run123",
+                status: "running",
+                commits_indexed: 12,
+                files_processed: 34,
+                cursor_sha: "cursor-sha",
+                target_head_sha: "head-sha",
+                message: "Indexing commits",
+              })
+            }
+          >
+            Set Progress
+          </button>
+          <button onClick={() => clearScanProgress("repo123")}>Clear Progress</button>
+        </div>
+      );
+    }
+
+    render(
+      <AppProvider>
+        <ScanProgressComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("scan-progress-status")).toHaveTextContent("none");
+
+    await user.click(screen.getByRole("button", { name: "Set Progress" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("scan-progress-status")).toHaveTextContent("running");
+      expect(screen.getByTestId("scan-progress-commits")).toHaveTextContent("12");
+      expect(screen.getByTestId("scan-progress-cursor")).toHaveTextContent("cursor-sha");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Clear Progress" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("scan-progress-status")).toHaveTextContent("none");
     });
   });
 });
