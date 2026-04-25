@@ -232,10 +232,12 @@
 **Purpose:** make long-running scans controllable by the user.
 
 **Files:**
+- Modify: `src-tauri/src/models/scan.rs`
 - Modify: `src-tauri/src/commands/repos.rs`
 - Modify: `src-tauri/src/git/scanner.rs`
 - Modify: `src/hooks/useRepos.ts`
 - Modify: `src/pages/Settings.tsx`
+- Modify: `src/pages/Dashboard.tsx`
 
 **Commands:**
 - `pause_scan(scan_run_id)`
@@ -243,9 +245,11 @@
 - `get_scan_status(repo_id)`
 
 **Acceptance Criteria:**
-- A paused scan has `status = paused` and can resume from its cursor.
-- A failed scan shows the error and can be resumed or restarted.
-- UI disables conflicting scan actions for the same repo.
+- [x] A paused scan has `status = paused` and can resume from its cursor.
+- [x] A failed scan shows the error and can be resumed or restarted.
+- [x] UI disables conflicting scan actions for the same repo.
+
+**Status:** completed.
 
 ---
 
