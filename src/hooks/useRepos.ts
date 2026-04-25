@@ -5,6 +5,66 @@ import { useEffect, useRef } from "react";
 import { useAppContext } from "../context/AppContext";
 import type { Repo, ScanProgress, ScanResult, Workspace } from "../types";
 
+type QueryInvalidator = {
+  invalidateQueries: (filters: { queryKey: unknown[] }) => unknown;
+};
+
+type ScanProgressResponse = Partial<ScanProgress> & {
+  id?: string;
+  repoId?: string;
+  scanRunId?: string;
+  commitsIndexed?: number;
+  filesProcessed?: number;
+  cursorSha?: string | null;
+  lastIndexedCommitSha?: string | null;
+  targetHeadSha?: string;
+  error_message?: string | null;
+};
+
+function invalidateScanDependentQueries(qc: QueryInvalidator, repoId?: string) {
+  qc.invalidateQueries({ queryKey: ["stats"] });
+  qc.invalidateQueries({ queryKey: ["daily_stats"] });
+  qc.invalidateQueries({ queryKey: ["file_stats"] });
+  qc.invalidateQueries({ queryKey: ["directory_stats"] });
+  qc.invalidateQueries({ queryKey: ["leaderboard"] });
+  qc.invalidateQueries({ queryKey: ["box_score"] });
+  qc.invalidateQueries({ queryKey: ["repos"] });
+
+  if (repoId != null) {
+    qc.invalidateQueries({ queryKey: ["scan_status", repoId] });
+  }
+}
+
+function normalizeScanProgress(progress: ScanProgressResponse | null): ScanProgress | null {
+  if (progress == null) return null;
+
+  const normalized: ScanProgress = {
+    repo_id: progress.repo_id ?? progress.repoId ?? "",
+    scan_run_id: progress.scan_run_id ?? progress.scanRunId ?? progress.id ?? "",
+    status: progress.status ?? "running",
+    commits_indexed: progress.commits_indexed ?? progress.commitsIndexed ?? 0,
+    files_processed: progress.files_processed ?? progress.filesProcessed ?? 0,
+    cursor_sha: progress.cursor_sha ?? progress.cursorSha ?? null,
+    target_head_sha: progress.target_head_sha ?? progress.targetHeadSha ?? "",
+  };
+
+  const lastIndexedCommitSha =
+    progress.last_indexed_commit_sha ?? progress.lastIndexedCommitSha;
+  if (lastIndexedCommitSha !== undefined) {
+    normalized.last_indexed_commit_sha = lastIndexedCommitSha;
+  }
+  if (progress.message !== undefined) {
+    normalized.message = progress.message;
+  }
+  if (progress.error !== undefined) {
+    normalized.error = progress.error;
+  } else if (progress.error_message != null) {
+    normalized.error = progress.error_message;
+  }
+
+  return normalized;
+}
+
 // ── Workspaces ────────────────────────────────────────────────────────────────
 
 export function useWorkspaces() {
@@ -99,18 +159,43 @@ export function useTriggerScan() {
     },
     onSuccess: (_data, repoId) => {
       console.log("[Scan] onSuccess callback triggered for repo", repoId);
-      // Invalidate all stats after a scan
-      qc.invalidateQueries({ queryKey: ["stats"] });
-      qc.invalidateQueries({ queryKey: ["daily_stats"] });
-      qc.invalidateQueries({ queryKey: ["file_stats"] });
-      qc.invalidateQueries({ queryKey: ["directory_stats"] });
-      qc.invalidateQueries({ queryKey: ["leaderboard"] });
-      qc.invalidateQueries({ queryKey: ["box_score"] });
-      qc.invalidateQueries({ queryKey: ["repos"] });
+      invalidateScanDependentQueries(qc, repoId);
     },
     onError: (error, repoId) => {
       console.error("[Scan] Error scanning repo", repoId, error);
     },
+  });
+}
+
+export function usePauseScan() {
+  return useMutation<void, string, string>({
+    mutationFn: (scanRunId) => invoke("pause_scan", { scanRunId }),
+  });
+}
+
+export function useResumeScan() {
+  const qc = useQueryClient();
+  return useMutation<ScanResult, string, string>({
+    mutationFn: async (repoId) => {
+      const result = await invoke("resume_scan", { repoId });
+      return result as ScanResult;
+    },
+    onSuccess: (_data, repoId) => {
+      invalidateScanDependentQueries(qc, repoId);
+    },
+  });
+}
+
+export function useScanStatus(repoId: string | null) {
+  return useQuery<ScanProgress | null>({
+    queryKey: ["scan_status", repoId],
+    queryFn: async () => {
+      const result = await invoke<ScanProgressResponse | null>("get_scan_status", {
+        repoId,
+      });
+      return normalizeScanProgress(result);
+    },
+    enabled: repoId != null,
   });
 }
 
@@ -153,13 +238,7 @@ export function useScanProgressEvents() {
         case "completed":
           handlers.setScanningRepoId(null);
           handlers.setSyncStatus("");
-          qc.invalidateQueries({ queryKey: ["stats"] });
-          qc.invalidateQueries({ queryKey: ["daily_stats"] });
-          qc.invalidateQueries({ queryKey: ["file_stats"] });
-          qc.invalidateQueries({ queryKey: ["directory_stats"] });
-          qc.invalidateQueries({ queryKey: ["leaderboard"] });
-          qc.invalidateQueries({ queryKey: ["box_score"] });
-          qc.invalidateQueries({ queryKey: ["repos"] });
+          invalidateScanDependentQueries(qc, progress.repo_id);
           break;
         case "failed":
           handlers.setScanningRepoId(null);

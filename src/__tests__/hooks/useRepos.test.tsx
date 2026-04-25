@@ -6,6 +6,9 @@ import {
   useCreateWorkspace,
   useAddRepo,
   useTriggerScan,
+  usePauseScan,
+  useResumeScan,
+  useScanStatus,
   useDeleteWorkspace,
   useRemoveRepo,
   useSetRepoBranch,
@@ -492,6 +495,135 @@ describe("useRepos hooks", () => {
       expect(consoleSpy).toHaveBeenCalledWith("[Scan] onSuccess callback triggered for repo", "repo1");
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe("usePauseScan", () => {
+    it("pauses a scan run with the expected payload", async () => {
+      (invoke as jest.Mock).mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => usePauseScan(), { wrapper });
+
+      await act(async () => {
+        result.current.mutate("scan1");
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(invoke).toHaveBeenCalledWith("pause_scan", { scanRunId: "scan1" });
+    });
+  });
+
+  describe("useResumeScan", () => {
+    it("resumes a scan for a repo with the expected payload", async () => {
+      const mockScanResult = { commits_added: 25, files_processed: 7 };
+      (invoke as jest.Mock).mockResolvedValue(mockScanResult);
+
+      const { result } = renderHook(() => useResumeScan(), { wrapper });
+
+      await act(async () => {
+        result.current.mutate("repo1");
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual(mockScanResult);
+      expect(invoke).toHaveBeenCalledWith("resume_scan", { repoId: "repo1" });
+    });
+
+    it("invalidates scan-dependent queries on success", async () => {
+      const mockScanResult = { commits_added: 25, files_processed: 7 };
+      (invoke as jest.Mock).mockResolvedValue(mockScanResult);
+
+      const invalidateQuerySpy = jest.spyOn(queryClient, "invalidateQueries");
+
+      const { result } = renderHook(() => useResumeScan(), { wrapper });
+
+      await act(async () => {
+        result.current.mutate("repo1");
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["stats"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["daily_stats"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["file_stats"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["directory_stats"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["leaderboard"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["box_score"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["repos"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["scan_status", "repo1"] });
+    });
+  });
+
+  describe("useScanStatus", () => {
+    it("fetches scan status for a repo with the expected payload", async () => {
+      const mockProgress = {
+        id: "scan1",
+        repo_id: "repo1",
+        status: "paused",
+        commits_indexed: 12,
+        files_processed: 4,
+        cursor_sha: "commit-a",
+        target_head_sha: "commit-z",
+        error_message: null,
+      };
+      (invoke as jest.Mock).mockResolvedValue(mockProgress);
+
+      const { result } = renderHook(() => useScanStatus("repo1"), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toMatchObject({
+        repo_id: "repo1",
+        scan_run_id: "scan1",
+        status: "paused",
+        commits_indexed: 12,
+        files_processed: 4,
+        cursor_sha: "commit-a",
+        target_head_sha: "commit-z",
+      });
+      expect(invoke).toHaveBeenCalledWith("get_scan_status", { repoId: "repo1" });
+    });
+
+    it("maps failed scan run errors from the backend status shape", async () => {
+      (invoke as jest.Mock).mockResolvedValue({
+        id: "scan2",
+        repo_id: "repo1",
+        status: "failed",
+        commits_indexed: 6,
+        files_processed: 3,
+        cursor_sha: "commit-b",
+        target_head_sha: "commit-z",
+        error_message: "boom",
+      });
+
+      const { result } = renderHook(() => useScanStatus("repo1"), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toMatchObject({
+        scan_run_id: "scan2",
+        status: "failed",
+        error: "boom",
+      });
+    });
+
+    it("does not fetch scan status when repoId is null", () => {
+      const { result } = renderHook(() => useScanStatus(null), { wrapper });
+
+      expect(result.current.isLoading).toBe(false);
+      expect(invoke).not.toHaveBeenCalled();
     });
   });
 

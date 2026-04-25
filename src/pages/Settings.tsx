@@ -8,10 +8,12 @@ import {
   useRepos,
   useTriggerScan,
   useSetRepoBranch,
+  usePauseScan,
+  useResumeScan,
 } from "../hooks/useRepos";
 import { useUpdateFormula } from "../hooks/useStats";
 import { useAppContext } from "../context/AppContext";
-import { Plus, Trash2, RefreshCw, FlaskConical, ChevronDown } from "lucide-react";
+import { Plus, Trash2, RefreshCw, FlaskConical, ChevronDown, Pause, Play } from "lucide-react";
 import type { ScanProgress } from "../types";
 
 const DEFAULT_FORMULA =
@@ -29,6 +31,8 @@ export default function Settings() {
   const deleteWs = useDeleteWorkspace();
   const addRepo = useAddRepo();
   const triggerScan = useTriggerScan();
+  const pauseScan = usePauseScan();
+  const resumeScan = useResumeScan();
   const updateFormula = useUpdateFormula();
 
   const [wsName, setWsName] = useState("");
@@ -205,7 +209,12 @@ export default function Settings() {
             <div className="space-y-1">
               {repos.map((r) => {
                 const scanProgress = scanProgressByRepo[r.id];
+                const scanStatus = scanProgress?.status;
                 const isRepoScanning = scanningRepoId === r.id;
+                const hasActiveScanForAnotherRepo = scanningRepoId !== null && scanningRepoId !== r.id;
+                const isScanActionPending = triggerScan.isPending || resumeScan.isPending;
+                const canPauseScan = scanStatus === "running";
+                const canResumeScan = scanStatus === "paused" || scanStatus === "failed";
                 const progressMessage = scanProgress?.error || scanProgress?.message;
 
                 return (
@@ -236,7 +245,7 @@ export default function Settings() {
                         </div>
                       </div>
                       <span className="text-xs text-on-surface-variant ml-2 font-mono block mt-1 truncate">{r.path}</span>
-                      {isRepoScanning && (scanProgress || syncStatus) && (
+                      {(isRepoScanning || scanStatus === "failed") && (scanProgress || syncStatus) && (
                         <div className="mt-1.5 ml-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant">
                           {scanProgress ? (
                             <>
@@ -257,9 +266,9 @@ export default function Settings() {
                         </div>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
+                    <div className="flex shrink-0 items-center gap-2">
                       <button
-                        disabled={triggerScan.isPending || scanningRepoId !== null}
+                        disabled={isScanActionPending || pauseScan.isPending || scanningRepoId !== null}
                         onClick={() => {
                           console.log("[UI] Sync clicked for repo", r.id);
                           setScanningRepoId(r.id);
@@ -284,6 +293,52 @@ export default function Settings() {
                         <RefreshCw size={12} className={isRepoScanning && triggerScan.isPending ? "animate-spin" : ""} />
                         Sync
                       </button>
+                      {canPauseScan && (
+                        <button
+                          disabled={pauseScan.isPending || !scanProgress?.scan_run_id || hasActiveScanForAnotherRepo}
+                          onClick={() => {
+                            if (!scanProgress?.scan_run_id) return;
+
+                            pauseScan.mutate(scanProgress.scan_run_id, {
+                              onSuccess: () => {
+                                addNotification(`${r.name}: Scan paused`, "success");
+                              },
+                              onError: (error) => {
+                                console.error("[UI] Pause scan error for repo", r.id, error);
+                                addNotification(`${r.name}: Pause failed`, "error");
+                              },
+                            });
+                          }}
+                          className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary transition-colors disabled:opacity-40"
+                        >
+                          <Pause size={12} />
+                          Pause
+                        </button>
+                      )}
+                      {canResumeScan && (
+                        <button
+                          disabled={isScanActionPending || pauseScan.isPending || !scanProgress?.scan_run_id || hasActiveScanForAnotherRepo}
+                          onClick={() => {
+                            setScanningRepoId(r.id);
+                            setSyncStatus("Resuming scan...");
+                            resumeScan.mutate(r.id, {
+                              onSuccess: () => {
+                                addNotification(`${r.name}: Scan resumed`, "success");
+                              },
+                              onError: (error) => {
+                                console.error("[UI] Resume scan error for repo", r.id, error);
+                                addNotification(`${r.name}: Resume failed`, "error");
+                                setScanningRepoId(null);
+                                setSyncStatus("");
+                              },
+                            });
+                          }}
+                          className="flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary transition-colors disabled:opacity-40"
+                        >
+                          <Play size={12} />
+                          Resume
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

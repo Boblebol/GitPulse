@@ -1,8 +1,8 @@
 import { useAppContext } from "../context/AppContext";
 import { useDeveloperGlobalStats } from "../hooks/useStats";
-import { useTriggerScan } from "../hooks/useRepos";
+import { usePauseScan, useResumeScan, useScanStatus, useTriggerScan } from "../hooks/useRepos";
 import StatCard from "../components/StatCard";
-import { RefreshCw, Flame, GitCommit, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Flame, GitCommit, Clock, AlertCircle, CheckCircle2, Pause, Play } from "lucide-react";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -20,11 +20,25 @@ export default function Dashboard() {
   } = useAppContext();
   const { data: devStats = [], isLoading } = useDeveloperGlobalStats();
   const scan = useTriggerScan();
-  const scanProgress = repoId ? scanProgressByRepo[repoId] : undefined;
+  const pauseScan = usePauseScan();
+  const resumeScan = useResumeScan();
+  const { data: persistedScanProgress } = useScanStatus(repoId);
+  const scanProgress = repoId
+    ? scanProgressByRepo[repoId] ?? persistedScanProgress ?? undefined
+    : undefined;
   const hasScanProgress = scanProgress != null;
   const isSelectedRepoScanning =
     repoId != null && (scan.isPending || scanningRepoId === repoId);
-  const syncDisabled = scan.isPending || scanningRepoId !== null;
+  const isScanControlPending = pauseScan.isPending || resumeScan.isPending;
+  const scanRunId = scanProgress?.scan_run_id;
+  const isScanRunning = scanProgress?.status === "running";
+  const canResumeScan =
+    scanProgress?.status === "paused" || scanProgress?.status === "failed";
+  const syncDisabled = scan.isPending || scanningRepoId !== null || isScanControlPending;
+  const pauseDisabled =
+    !scanRunId || !isScanRunning || scan.isPending || isScanControlPending;
+  const resumeDisabled =
+    !scanRunId || !canResumeScan || scan.isPending || isScanControlPending;
   const scanStatusLabel = scanProgress
     ? scanProgress.status.charAt(0).toUpperCase() + scanProgress.status.slice(1)
     : "";
@@ -49,6 +63,18 @@ export default function Dashboard() {
         setSyncStatus("");
       },
     });
+  };
+
+  const handlePauseScan = () => {
+    if (!scanRunId || pauseDisabled) return;
+
+    pauseScan.mutate(scanRunId);
+  };
+
+  const handleResumeScan = () => {
+    if (!repoId || resumeDisabled) return;
+
+    resumeScan.mutate(repoId);
   };
 
   const totals = devStats.reduce(
@@ -133,6 +159,32 @@ export default function Dashboard() {
               <p className="min-w-0 flex-1 basis-full truncate text-xs opacity-80 sm:basis-auto">
                 {scanProgress.error || scanProgress.message}
               </p>
+            )}
+            {(isScanRunning || canResumeScan) && (
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                {isScanRunning && (
+                  <button
+                    type="button"
+                    onClick={handlePauseScan}
+                    disabled={pauseDisabled}
+                    className="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1.5 text-xs font-semibold text-on-surface disabled:opacity-50 transition-opacity"
+                  >
+                    <Pause size={13} />
+                    Pause
+                  </button>
+                )}
+                {canResumeScan && (
+                  <button
+                    type="button"
+                    onClick={handleResumeScan}
+                    disabled={resumeDisabled}
+                    className="flex items-center gap-1.5 rounded-full bg-surface-container-highest px-3 py-1.5 text-xs font-semibold text-on-surface disabled:opacity-50 transition-opacity"
+                  >
+                    <Play size={13} />
+                    Resume
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
