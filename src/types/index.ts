@@ -217,6 +217,15 @@ export interface HistoricalRecordRow {
   explanation: string;
 }
 
+export interface HallOfFameEntry {
+  category_key: string;
+  title: string;
+  developer_id: string;
+  developer_name: string;
+  value: number;
+  highlight: string;
+}
+
 // ── V3 Code Health ───────────────────────────────────────────────────────────
 
 export interface FileHealthRow {
@@ -244,4 +253,65 @@ export interface DirectoryHealthRow {
   silo_file_count: number;
   churn_score: number;
   directory_health_score: number;
+}
+
+export interface DeveloperFocusRow {
+  developer_id: string;
+  developer_name: string;
+  commits: number;
+  active_days: number;
+  files_touched: number;
+  directories_touched: number;
+  context_switching_index: number;
+  focus_score: number;
+  profile_label: string;
+}
+
+export interface ReviewRiskCommitRow {
+  commit_id: string;
+  sha: string;
+  message: string;
+  committed_at: string;
+  developer_id: string;
+  developer_name: string;
+  files_changed: number;
+  insertions: number;
+  deletions: number;
+  directories_touched: number;
+  max_file_co_touch_score: number;
+  risk_score: number;
+}
+
+export interface ActivitySignalRow {
+  period_bucket: string;
+  commits: number;
+  insertions: number;
+  deletions: number;
+  files_changed: number;
+  refactor_score: number;
+  feature_score: number;
+  cleanup_score: number;
+  maintenance_score: number;
+  dominant_signal: string;
+}
+
+export interface FileVolatilityRow {
+  file_id: string;
+  file_path: string;
+  active_days: number;
+  active_weeks: number;
+  commits: number;
+  churn: number;
+  unique_authors: number;
+  volatility_score: number;
+}
+
+export interface FileCouplingRow {
+  source_file_id: string;
+  source_file_path: string;
+  target_file_id: string;
+  target_file_path: string;
+  co_touch_count: number;
+  last_touched_at: string | null;
+  coupling_score: number;
 }

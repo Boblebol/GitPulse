@@ -85,9 +85,15 @@ pub fn run() {
             commands::history::get_period_leaderboard,
             commands::history::get_period_awards,
             commands::history::get_historical_records,
+            commands::history::get_hall_of_fame,
             // code health
             commands::health::get_file_health_stats,
             commands::health::get_directory_health_stats,
+            commands::health::get_developer_focus_stats,
+            commands::health::get_review_risk_commits,
+            commands::health::get_activity_signal_stats,
+            commands::health::get_file_volatility_stats,
+            commands::health::get_file_coupling_graph,
             // boxscore
             commands::boxscore::get_box_score,
             commands::boxscore::get_leaderboard,

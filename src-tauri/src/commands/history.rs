@@ -45,6 +45,16 @@ pub struct HistoricalRecord {
     pub explanation: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HallOfFameEntry {
+    pub category_key: String,
+    pub title: String,
+    pub developer_id: String,
+    pub developer_name: String,
+    pub value: f64,
+    pub highlight: String,
+}
+
 // ── Error ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, thiserror::Error)]
@@ -380,6 +390,127 @@ pub async fn get_historical_records(
     .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn get_hall_of_fame(
+    state: tauri::State<'_, AppState>,
+    repo_id: Option<String>,
+    workspace_id: Option<String>,
+) -> Result<Vec<HallOfFameEntry>, String> {
+    inner_get_hall_of_fame(&state.db, repo_id.as_deref(), workspace_id.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_get_hall_of_fame(
+    pool: &SqlitePool,
+    repo_id: Option<&str>,
+    workspace_id: Option<&str>,
+) -> Result<Vec<HallOfFameEntry>, HistoryError> {
+    let board =
+        inner_get_period_leaderboard(pool, repo_id, workspace_id, "all_time", "all").await?;
+    if board.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = Vec::new();
+    if let Some(row) = board.first() {
+        entries.push(hof_entry(
+            "career_mvp",
+            "Career MVP",
+            row,
+            row.total_player_score,
+            "Highest all-time player score.",
+        ));
+    }
+    if let Some(row) = board.iter().max_by(|a, b| {
+        a.avg_player_score
+            .total_cmp(&b.avg_player_score)
+            .then_with(|| b.developer_name.cmp(&a.developer_name))
+            .then_with(|| b.developer_id.cmp(&a.developer_id))
+    }) {
+        entries.push(hof_entry(
+            "scoring_champion",
+            "Scoring Champion",
+            row,
+            row.avg_player_score,
+            "Best average daily player score.",
+        ));
+    }
+    if let Some(row) = board.iter().max_by(|a, b| {
+        a.total_insertions
+            .cmp(&b.total_insertions)
+            .then_with(|| b.developer_name.cmp(&a.developer_name))
+            .then_with(|| b.developer_id.cmp(&a.developer_id))
+    }) {
+        entries.push(hof_entry(
+            "best_adder_career",
+            "Best Adder Career",
+            row,
+            row.total_insertions as f64,
+            "Most all-time insertions.",
+        ));
+    }
+    if let Some(row) = board.iter().max_by(|a, b| {
+        a.total_deletions
+            .cmp(&b.total_deletions)
+            .then_with(|| b.developer_name.cmp(&a.developer_name))
+            .then_with(|| b.developer_id.cmp(&a.developer_id))
+    }) {
+        entries.push(hof_entry(
+            "best_remover_career",
+            "Best Remover Career",
+            row,
+            row.total_deletions as f64,
+            "Most all-time deletions.",
+        ));
+    }
+    if let Some(row) = board.iter().max_by(|a, b| {
+        a.active_days
+            .cmp(&b.active_days)
+            .then(a.best_streak.cmp(&b.best_streak))
+            .then_with(|| b.developer_name.cmp(&a.developer_name))
+            .then_with(|| b.developer_id.cmp(&a.developer_id))
+    }) {
+        entries.push(hof_entry(
+            "iron_legend",
+            "Iron Legend",
+            row,
+            row.active_days as f64,
+            "Most all-time active days.",
+        ));
+    }
+    if let Some(row) = board.iter().max_by(|a, b| {
+        a.best_streak
+            .cmp(&b.best_streak)
+            .then_with(|| b.developer_name.cmp(&a.developer_name))
+            .then_with(|| b.developer_id.cmp(&a.developer_id))
+    }) {
+        entries.push(hof_entry(
+            "streak_legend",
+            "Streak Legend",
+            row,
+            row.best_streak as f64,
+            "Longest all-time streak.",
+        ));
+    }
+    if let Some(row) = board.iter().max_by(|a, b| {
+        a.files_touched
+            .cmp(&b.files_touched)
+            .then_with(|| b.developer_name.cmp(&a.developer_name))
+            .then_with(|| b.developer_id.cmp(&a.developer_id))
+    }) {
+        entries.push(hof_entry(
+            "range_legend",
+            "Range Legend",
+            row,
+            row.files_touched as f64,
+            "Most all-time files touched.",
+        ));
+    }
+
+    Ok(entries)
+}
+
 pub(crate) async fn inner_get_historical_records(
     pool: &SqlitePool,
     repo_id: Option<&str>,
@@ -598,6 +729,23 @@ fn award(
         winner_developer_name: row.developer_name.clone(),
         metric_value,
         explanation: explanation.into(),
+    }
+}
+
+fn hof_entry(
+    category_key: &str,
+    title: &str,
+    row: &PeriodLeaderboardEntry,
+    value: f64,
+    highlight: &str,
+) -> HallOfFameEntry {
+    HallOfFameEntry {
+        category_key: category_key.into(),
+        title: title.into(),
+        developer_id: row.developer_id.clone(),
+        developer_name: row.developer_name.clone(),
+        value,
+        highlight: highlight.into(),
     }
 }
 
@@ -1008,6 +1156,33 @@ mod tests {
         assert!(keys.contains(&"biggest_year"));
         assert!(keys.contains(&"most_active_file"));
         assert!(keys.contains(&"hottest_file"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn hall_of_fame_returns_career_categories() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(&repo, "a1", "Alice", "a@x.com", &[("a.txt", "a")], JAN_1);
+        commit_at(&repo, "a2", "Alice", "a@x.com", &[("b.txt", "b")], JAN_2);
+        commit_at(&repo, "b1", "Bob", "b@x.com", &[("c.txt", "c")], APR_1);
+        let (_, repo_id) = scan_and_recalculate(&tmp, &pool).await;
+
+        let entries = inner_get_hall_of_fame(&pool, Some(&repo_id), None)
+            .await
+            .unwrap();
+        let keys: Vec<&str> = entries
+            .iter()
+            .map(|entry| entry.category_key.as_str())
+            .collect();
+
+        assert!(keys.contains(&"career_mvp"));
+        assert!(keys.contains(&"scoring_champion"));
+        assert!(keys.contains(&"best_adder_career"));
+        assert!(keys.contains(&"best_remover_career"));
+        assert!(keys.contains(&"iron_legend"));
+        assert!(keys.contains(&"streak_legend"));
+        assert!(keys.contains(&"range_legend"));
     }
 
     #[tokio::test(flavor = "multi_thread")]

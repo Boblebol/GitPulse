@@ -32,6 +32,72 @@ pub struct DirectoryHealthRow {
     pub churn_score: f64,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DeveloperFocusRow {
+    pub developer_id: String,
+    pub developer_name: String,
+    pub commits: i64,
+    pub active_days: i64,
+    pub files_touched: i64,
+    pub directories_touched: i64,
+    pub context_switching_index: f64,
+    pub focus_score: f64,
+    pub profile_label: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ReviewRiskCommitRow {
+    pub commit_id: String,
+    pub sha: String,
+    pub message: String,
+    pub committed_at: String,
+    pub developer_id: String,
+    pub developer_name: String,
+    pub files_changed: i64,
+    pub insertions: i64,
+    pub deletions: i64,
+    pub directories_touched: i64,
+    pub max_file_co_touch_score: f64,
+    pub risk_score: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ActivitySignalRow {
+    pub period_bucket: String,
+    pub commits: i64,
+    pub insertions: i64,
+    pub deletions: i64,
+    pub files_changed: i64,
+    pub refactor_score: f64,
+    pub feature_score: f64,
+    pub cleanup_score: f64,
+    pub maintenance_score: f64,
+    pub dominant_signal: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct FileVolatilityRow {
+    pub file_id: String,
+    pub file_path: String,
+    pub active_days: i64,
+    pub active_weeks: i64,
+    pub commits: i64,
+    pub churn: i64,
+    pub unique_authors: i64,
+    pub volatility_score: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct FileCouplingRow {
+    pub source_file_id: String,
+    pub source_file_path: String,
+    pub target_file_id: String,
+    pub target_file_path: String,
+    pub co_touch_count: i64,
+    pub last_touched_at: Option<String>,
+    pub coupling_score: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PeriodBounds {
     from_date: Option<String>,
@@ -240,6 +306,487 @@ pub async fn get_directory_health_stats(
     inner_get_directory_health_stats(&state.db, &repo_id, &period_type, &period_key)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_developer_focus_stats(
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+    period_type: String,
+    period_key: String,
+) -> Result<Vec<DeveloperFocusRow>, String> {
+    inner_get_developer_focus_stats(&state.db, &repo_id, &period_type, &period_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_get_developer_focus_stats(
+    pool: &SqlitePool,
+    repo_id: &str,
+    period_type: &str,
+    period_key: &str,
+) -> Result<Vec<DeveloperFocusRow>, HealthError> {
+    let bounds = parse_period(period_type, period_key)?;
+
+    sqlx::query_as(
+        "WITH scoped_changes AS (
+             SELECT c.id AS commit_id,
+                    date(c.committed_at) AS commit_date,
+                    a.developer_id,
+                    d.name AS developer_name,
+                    f.id AS file_id,
+                    CASE
+                        WHEN instr(f.current_path, '/') > 0
+                        THEN substr(f.current_path, 1, instr(f.current_path, '/') - 1)
+                        ELSE 'root'
+                    END AS directory_path
+             FROM commits c
+             JOIN aliases a ON a.id = c.author_alias_id
+             JOIN developers d ON d.id = a.developer_id
+             JOIN commit_file_changes cfc ON cfc.commit_id = c.id
+             JOIN files f ON f.id = cfc.file_id
+             WHERE c.repo_id = ?
+               AND (? IS NULL OR date(c.committed_at) >= ?)
+               AND (? IS NULL OR date(c.committed_at) <= ?)
+         ),
+         rows AS (
+             SELECT developer_id,
+                    developer_name,
+                    COUNT(DISTINCT commit_id) AS commits,
+                    COUNT(DISTINCT commit_date) AS active_days,
+                    COUNT(DISTINCT file_id) AS files_touched,
+                    COUNT(DISTINCT directory_path) AS directories_touched
+             FROM scoped_changes
+             GROUP BY developer_id, developer_name
+         ),
+         maxes AS (
+             SELECT MAX(files_touched) AS max_files,
+                    MAX(directories_touched) AS max_dirs,
+                    MAX(active_days) AS max_days
+             FROM rows
+         )
+         SELECT rows.developer_id,
+                rows.developer_name,
+                rows.commits,
+                rows.active_days,
+                rows.files_touched,
+                rows.directories_touched,
+                ROUND(MIN(
+                    (
+                        CASE WHEN maxes.max_files > 0
+                             THEN CAST(rows.files_touched AS REAL) / maxes.max_files * 45.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_dirs > 0
+                             THEN CAST(rows.directories_touched AS REAL) / maxes.max_dirs * 40.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_days > 0
+                             THEN CAST(rows.active_days AS REAL) / maxes.max_days * 15.0
+                             ELSE 0.0 END
+                    ),
+                    100.0
+                ), 2) AS context_switching_index,
+                ROUND(MAX(
+                    100.0 - (
+                        (
+                            CASE WHEN maxes.max_files > 0
+                                 THEN CAST(rows.files_touched AS REAL) / maxes.max_files * 45.0
+                                 ELSE 0.0 END
+                        ) + (
+                            CASE WHEN maxes.max_dirs > 0
+                                 THEN CAST(rows.directories_touched AS REAL) / maxes.max_dirs * 40.0
+                                 ELSE 0.0 END
+                        ) + (
+                            CASE WHEN maxes.max_days > 0
+                                 THEN CAST(rows.active_days AS REAL) / maxes.max_days * 15.0
+                                 ELSE 0.0 END
+                        )
+                    ),
+                    0.0
+                ), 2) AS focus_score,
+                CASE
+                    WHEN rows.directories_touched >= 4 THEN 'Cross-area contributor'
+                    WHEN rows.directories_touched <= 1 AND rows.files_touched <= 5 THEN 'Focused specialist'
+                    ELSE 'Balanced contributor'
+                END AS profile_label
+         FROM rows
+         CROSS JOIN maxes
+         ORDER BY context_switching_index DESC, rows.commits DESC, rows.developer_name ASC",
+    )
+    .bind(repo_id)
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .fetch_all(pool)
+    .await
+    .map_err(HealthError::Db)
+}
+
+#[tauri::command]
+pub async fn get_review_risk_commits(
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+    period_type: String,
+    period_key: String,
+) -> Result<Vec<ReviewRiskCommitRow>, String> {
+    inner_get_review_risk_commits(&state.db, &repo_id, &period_type, &period_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_get_review_risk_commits(
+    pool: &SqlitePool,
+    repo_id: &str,
+    period_type: &str,
+    period_key: &str,
+) -> Result<Vec<ReviewRiskCommitRow>, HealthError> {
+    let bounds = parse_period(period_type, period_key)?;
+
+    sqlx::query_as(
+        "WITH commit_dirs AS (
+             SELECT c.id AS commit_id,
+                    COUNT(DISTINCT CASE
+                        WHEN instr(f.current_path, '/') > 0
+                        THEN substr(f.current_path, 1, instr(f.current_path, '/') - 1)
+                        ELSE 'root'
+                    END) AS directories_touched,
+                    COALESCE(MAX(sfg.co_touch_score), 0.0) AS max_file_co_touch_score
+             FROM commits c
+             JOIN commit_file_changes cfc ON cfc.commit_id = c.id
+             JOIN files f ON f.id = cfc.file_id
+             LEFT JOIN stats_file_global sfg ON sfg.file_id = f.id
+             WHERE c.repo_id = ?
+               AND (? IS NULL OR date(c.committed_at) >= ?)
+               AND (? IS NULL OR date(c.committed_at) <= ?)
+             GROUP BY c.id
+         ),
+         rows AS (
+             SELECT c.id AS commit_id,
+                    c.sha,
+                    c.message,
+                    c.committed_at,
+                    a.developer_id,
+                    d.name AS developer_name,
+                    c.files_changed,
+                    c.insertions,
+                    c.deletions,
+                    cd.directories_touched,
+                    cd.max_file_co_touch_score,
+                    c.insertions + c.deletions AS churn
+             FROM commits c
+             JOIN aliases a ON a.id = c.author_alias_id
+             JOIN developers d ON d.id = a.developer_id
+             JOIN commit_dirs cd ON cd.commit_id = c.id
+             WHERE c.repo_id = ?
+               AND (? IS NULL OR date(c.committed_at) >= ?)
+               AND (? IS NULL OR date(c.committed_at) <= ?)
+         ),
+         maxes AS (
+             SELECT MAX(files_changed) AS max_files,
+                    MAX(churn) AS max_churn,
+                    MAX(deletions) AS max_deletions,
+                    MAX(directories_touched) AS max_dirs,
+                    MAX(max_file_co_touch_score) AS max_co_touch
+             FROM rows
+         )
+         SELECT rows.commit_id,
+                rows.sha,
+                rows.message,
+                rows.committed_at,
+                rows.developer_id,
+                rows.developer_name,
+                rows.files_changed,
+                rows.insertions,
+                rows.deletions,
+                rows.directories_touched,
+                rows.max_file_co_touch_score,
+                ROUND(
+                    (
+                        CASE WHEN maxes.max_files > 0
+                             THEN CAST(rows.files_changed AS REAL) / maxes.max_files * 30.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_churn > 0
+                             THEN CAST(rows.churn AS REAL) / maxes.max_churn * 25.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_deletions > 0
+                             THEN CAST(rows.deletions AS REAL) / maxes.max_deletions * 15.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_dirs > 0
+                             THEN CAST(rows.directories_touched AS REAL) / maxes.max_dirs * 15.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_co_touch > 0
+                             THEN rows.max_file_co_touch_score / maxes.max_co_touch * 15.0
+                             ELSE 0.0 END
+                    ),
+                    2
+                ) AS risk_score
+         FROM rows
+         CROSS JOIN maxes
+         ORDER BY risk_score DESC, rows.committed_at DESC
+         LIMIT 50",
+    )
+    .bind(repo_id)
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(repo_id)
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .fetch_all(pool)
+    .await
+    .map_err(HealthError::Db)
+}
+
+#[tauri::command]
+pub async fn get_activity_signal_stats(
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+    period_type: String,
+    period_key: String,
+) -> Result<Vec<ActivitySignalRow>, String> {
+    inner_get_activity_signal_stats(&state.db, &repo_id, &period_type, &period_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_get_activity_signal_stats(
+    pool: &SqlitePool,
+    repo_id: &str,
+    period_type: &str,
+    period_key: &str,
+) -> Result<Vec<ActivitySignalRow>, HealthError> {
+    let bounds = parse_period(period_type, period_key)?;
+
+    sqlx::query_as(
+        "WITH rows AS (
+             SELECT substr(date(c.committed_at), 1, 7) AS period_bucket,
+                    COUNT(*) AS commits,
+                    SUM(c.insertions) AS insertions,
+                    SUM(c.deletions) AS deletions,
+                    SUM(c.files_changed) AS files_changed
+             FROM commits c
+             WHERE c.repo_id = ?
+               AND (? IS NULL OR date(c.committed_at) >= ?)
+               AND (? IS NULL OR date(c.committed_at) <= ?)
+             GROUP BY period_bucket
+         ),
+         scored AS (
+             SELECT period_bucket,
+                    commits,
+                    insertions,
+                    deletions,
+                    files_changed,
+                    CAST(insertions + deletions AS REAL) AS churn,
+                    CASE
+                        WHEN insertions + deletions > 0
+                        THEN 100.0 - ABS(CAST(insertions - deletions AS REAL)) / (insertions + deletions) * 100.0
+                        ELSE 0.0
+                    END AS balance_score,
+                    CASE WHEN commits > 0 THEN CAST(files_changed AS REAL) / commits ELSE 0.0 END AS files_per_commit
+             FROM rows
+         )
+         SELECT period_bucket,
+                commits,
+                insertions,
+                deletions,
+                files_changed,
+                ROUND(MIN(balance_score * 0.6 + files_per_commit * 8.0, 100.0), 2) AS refactor_score,
+                ROUND(CASE WHEN churn > 0 THEN CAST(insertions AS REAL) / churn * 100.0 ELSE 0.0 END, 2) AS feature_score,
+                ROUND(CASE WHEN churn > 0 THEN CAST(deletions AS REAL) / churn * 100.0 ELSE 0.0 END, 2) AS cleanup_score,
+                ROUND(MAX(100.0 - MIN(balance_score * 0.6 + files_per_commit * 8.0, 100.0), 0.0), 2) AS maintenance_score,
+                CASE
+                    WHEN churn > 0 AND CAST(insertions AS REAL) / churn >= 0.65 THEN 'feature'
+                    WHEN churn > 0 AND CAST(deletions AS REAL) / churn >= 0.55 THEN 'cleanup'
+                    WHEN balance_score >= 55.0 AND files_per_commit >= 2.0 THEN 'refactor'
+                    ELSE 'maintenance'
+                END AS dominant_signal
+         FROM scored
+         ORDER BY period_bucket DESC",
+    )
+    .bind(repo_id)
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .fetch_all(pool)
+    .await
+    .map_err(HealthError::Db)
+}
+
+#[tauri::command]
+pub async fn get_file_volatility_stats(
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+    period_type: String,
+    period_key: String,
+) -> Result<Vec<FileVolatilityRow>, String> {
+    inner_get_file_volatility_stats(&state.db, &repo_id, &period_type, &period_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_get_file_volatility_stats(
+    pool: &SqlitePool,
+    repo_id: &str,
+    period_type: &str,
+    period_key: &str,
+) -> Result<Vec<FileVolatilityRow>, HealthError> {
+    let bounds = parse_period(period_type, period_key)?;
+
+    sqlx::query_as(
+        "WITH rows AS (
+             SELECT f.id AS file_id,
+                    f.current_path AS file_path,
+                    COUNT(DISTINCT date(c.committed_at)) AS active_days,
+                    COUNT(DISTINCT strftime('%Y-%W', date(c.committed_at))) AS active_weeks,
+                    COUNT(DISTINCT c.id) AS commits,
+                    SUM(cfc.insertions + cfc.deletions) AS churn,
+                    COUNT(DISTINCT a.developer_id) AS unique_authors
+             FROM commit_file_changes cfc
+             JOIN commits c ON c.id = cfc.commit_id
+             JOIN files f ON f.id = cfc.file_id
+             JOIN aliases a ON a.id = c.author_alias_id
+             WHERE f.repo_id = ?
+               AND (? IS NULL OR date(c.committed_at) >= ?)
+               AND (? IS NULL OR date(c.committed_at) <= ?)
+             GROUP BY f.id, f.current_path
+         ),
+         maxes AS (
+             SELECT MAX(active_weeks) AS max_weeks,
+                    MAX(commits) AS max_commits,
+                    MAX(churn) AS max_churn,
+                    MAX(unique_authors) AS max_authors
+             FROM rows
+         )
+         SELECT rows.file_id,
+                rows.file_path,
+                rows.active_days,
+                rows.active_weeks,
+                rows.commits,
+                rows.churn,
+                rows.unique_authors,
+                ROUND(
+                    (
+                        CASE WHEN maxes.max_weeks > 0
+                             THEN CAST(rows.active_weeks AS REAL) / maxes.max_weeks * 35.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_commits > 0
+                             THEN CAST(rows.commits AS REAL) / maxes.max_commits * 25.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_churn > 0
+                             THEN CAST(rows.churn AS REAL) / maxes.max_churn * 25.0
+                             ELSE 0.0 END
+                    ) + (
+                        CASE WHEN maxes.max_authors > 0
+                             THEN CAST(rows.unique_authors AS REAL) / maxes.max_authors * 15.0
+                             ELSE 0.0 END
+                    ),
+                    2
+                ) AS volatility_score
+         FROM rows
+         CROSS JOIN maxes
+         ORDER BY volatility_score DESC, rows.commits DESC, rows.file_path ASC
+         LIMIT 50",
+    )
+    .bind(repo_id)
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .fetch_all(pool)
+    .await
+    .map_err(HealthError::Db)
+}
+
+#[tauri::command]
+pub async fn get_file_coupling_graph(
+    state: tauri::State<'_, AppState>,
+    repo_id: String,
+    period_type: String,
+    period_key: String,
+) -> Result<Vec<FileCouplingRow>, String> {
+    inner_get_file_coupling_graph(&state.db, &repo_id, &period_type, &period_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_get_file_coupling_graph(
+    pool: &SqlitePool,
+    repo_id: &str,
+    period_type: &str,
+    period_key: &str,
+) -> Result<Vec<FileCouplingRow>, HealthError> {
+    let bounds = parse_period(period_type, period_key)?;
+
+    sqlx::query_as(
+        "WITH scoped AS (
+             SELECT c.id AS commit_id,
+                    c.committed_at,
+                    cfc.file_id,
+                    f.current_path
+             FROM commits c
+             JOIN commit_file_changes cfc ON cfc.commit_id = c.id
+             JOIN files f ON f.id = cfc.file_id
+             WHERE c.repo_id = ?
+               AND (? IS NULL OR date(c.committed_at) >= ?)
+               AND (? IS NULL OR date(c.committed_at) <= ?)
+         ),
+         pairs AS (
+             SELECT left_side.file_id AS source_file_id,
+                    left_side.current_path AS source_file_path,
+                    right_side.file_id AS target_file_id,
+                    right_side.current_path AS target_file_path,
+                    COUNT(*) AS co_touch_count,
+                    MAX(left_side.committed_at) AS last_touched_at
+             FROM scoped left_side
+             JOIN scoped right_side
+               ON right_side.commit_id = left_side.commit_id
+              AND right_side.file_id > left_side.file_id
+             GROUP BY left_side.file_id,
+                      left_side.current_path,
+                      right_side.file_id,
+                      right_side.current_path
+         ),
+         maxes AS (
+             SELECT MAX(co_touch_count) AS max_co_touch_count
+             FROM pairs
+         )
+         SELECT pairs.source_file_id,
+                pairs.source_file_path,
+                pairs.target_file_id,
+                pairs.target_file_path,
+                pairs.co_touch_count,
+                pairs.last_touched_at,
+                ROUND(
+                    CASE WHEN maxes.max_co_touch_count > 0
+                         THEN CAST(pairs.co_touch_count AS REAL) / maxes.max_co_touch_count * 100.0
+                         ELSE 0.0 END,
+                    2
+                ) AS coupling_score
+         FROM pairs
+         CROSS JOIN maxes
+         ORDER BY coupling_score DESC, co_touch_count DESC, source_file_path ASC, target_file_path ASC
+         LIMIT 80",
+    )
+    .bind(repo_id)
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.from_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .bind(bounds.to_date.as_deref())
+    .fetch_all(pool)
+    .await
+    .map_err(HealthError::Db)
 }
 
 pub(crate) async fn inner_get_directory_health_stats(
@@ -782,5 +1329,76 @@ mod tests {
             .await
             .unwrap();
         assert!(rows.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn advanced_health_metrics_return_expected_rows() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(
+            &repo,
+            "wide change",
+            "Alice",
+            "a@x.com",
+            &[("src/a.rs", "1"), ("src/b.rs", "1"), ("tests/a.rs", "1")],
+            D1,
+        );
+        commit_at(
+            &repo,
+            "focused change",
+            "Alice",
+            "a@x.com",
+            &[("src/a.rs", "2")],
+            D2,
+        );
+        commit_at(
+            &repo,
+            "other area",
+            "Bob",
+            "b@x.com",
+            &[("docs/readme.md", "1")],
+            D3,
+        );
+        let repo_id = setup(&tmp, &pool).await;
+
+        let focus = inner_get_developer_focus_stats(&pool, &repo_id, "month", "2024-01")
+            .await
+            .unwrap();
+        assert_eq!(focus.len(), 2);
+        assert!(focus.iter().any(|row| row.developer_name == "Alice"));
+        assert!(focus
+            .iter()
+            .all(|row| (0.0..=100.0).contains(&row.focus_score)));
+
+        let risks = inner_get_review_risk_commits(&pool, &repo_id, "month", "2024-01")
+            .await
+            .unwrap();
+        assert_eq!(risks.len(), 3);
+        assert_eq!(risks[0].message, "wide change");
+        assert!((0.0..=100.0).contains(&risks[0].risk_score));
+
+        let signals = inner_get_activity_signal_stats(&pool, &repo_id, "month", "2024-01")
+            .await
+            .unwrap();
+        assert_eq!(signals.len(), 1);
+        assert_eq!(signals[0].period_bucket, "2024-01");
+        assert!(!signals[0].dominant_signal.is_empty());
+
+        let volatility = inner_get_file_volatility_stats(&pool, &repo_id, "month", "2024-01")
+            .await
+            .unwrap();
+        assert!(volatility.iter().any(|row| row.file_path == "src/a.rs"));
+        assert!(volatility
+            .iter()
+            .all(|row| (0.0..=100.0).contains(&row.volatility_score)));
+
+        let coupling = inner_get_file_coupling_graph(&pool, &repo_id, "month", "2024-01")
+            .await
+            .unwrap();
+        assert!(!coupling.is_empty());
+        assert!(coupling
+            .iter()
+            .any(|row| row.source_file_path == "src/a.rs" || row.target_file_path == "src/a.rs"));
     }
 }
