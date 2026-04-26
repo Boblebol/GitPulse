@@ -1,5 +1,10 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { AnalysisScope, AnalysisScopeMode, ScanProgress, TimeRange } from "../types";
+import {
+  hasDismissedProductTour,
+  markProductTourDismissed,
+  resetProductTourDismissed,
+} from "../utils/productTour";
 import { createTimeRange } from "../utils/timeRange";
 
 interface Notification {
@@ -28,6 +33,10 @@ interface AppContextValue {
   notifications: Notification[];
   addNotification: (message: string, type: "success" | "error") => void;
   removeNotification: (id: string) => void;
+  isProductTourOpen: boolean;
+  openProductTour: () => void;
+  dismissProductTour: () => void;
+  resetProductTour: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -42,6 +51,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [scanProgressByRepo, setScanProgressByRepo] = useState<Record<string, ScanProgress>>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isProductTourOpen, setIsProductTourOpen] = useState<boolean>(
+    () => !hasDismissedProductTour(),
+  );
 
   const updateWorkspaceId = (id: string | null) => {
     setWorkspaceId(id);
@@ -89,6 +101,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  const openProductTour = () => {
+    setIsProductTourOpen(true);
+  };
+
+  const dismissProductTour = () => {
+    markProductTourDismissed();
+    setIsProductTourOpen(false);
+  };
+
+  const resetProductTour = () => {
+    resetProductTourDismissed();
+    setIsProductTourOpen(true);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -111,6 +137,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notifications,
         addNotification,
         removeNotification,
+        isProductTourOpen,
+        openProductTour,
+        dismissProductTour,
+        resetProductTour,
       }}
     >
       {children}

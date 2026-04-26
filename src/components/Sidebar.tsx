@@ -10,6 +10,7 @@ import {
   History,
   Medal,
   HeartPulse,
+  HelpCircle,
   Settings,
   Zap,
 } from "lucide-react";
@@ -40,6 +41,7 @@ export default function Sidebar() {
     setRepoId,
     analysisScopeMode,
     setAnalysisScopeMode,
+    openProductTour,
   } = useAppContext();
   const { data: workspaces = [] } = useWorkspaces();
   const { data: repos = [] } = useRepos(workspaceId);
@@ -81,6 +83,15 @@ export default function Sidebar() {
 
       {/* Repo selector */}
       <div className="px-3 pb-4 pt-3 space-y-2 border-t border-outline-variant/15">
+        <button
+          type="button"
+          onClick={openProductTour}
+          className="flex w-full items-center gap-2 rounded-lg bg-surface-container px-3 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+        >
+          <HelpCircle size={15} />
+          Product Tour
+        </button>
+
         {/* Workspace select */}
         <div>
           <label className="text-xs text-on-surface-variant mb-1 block">Workspace</label>

@@ -15,7 +15,29 @@ function TestComponent() {
   );
 }
 
+function ProductTourStateComponent() {
+  const {
+    isProductTourOpen,
+    dismissProductTour,
+    openProductTour,
+    resetProductTour,
+  } = useAppContext();
+
+  return (
+    <div>
+      <div data-testid="tour-open">{String(isProductTourOpen)}</div>
+      <button onClick={dismissProductTour}>Dismiss Tour</button>
+      <button onClick={openProductTour}>Open Tour</button>
+      <button onClick={resetProductTour}>Reset Tour</button>
+    </div>
+  );
+}
+
 describe("AppContext", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("provides default values", () => {
     render(
       <AppProvider>
@@ -377,5 +399,60 @@ describe("AppContext", () => {
     await waitFor(() => {
       expect(screen.getByTestId("scan-progress-status")).toHaveTextContent("none");
     });
+  });
+
+  it("opens the product tour by default on first launch", () => {
+    render(
+      <AppProvider>
+        <ProductTourStateComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("tour-open")).toHaveTextContent("true");
+  });
+
+  it("persists product tour dismissal", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AppProvider>
+        <ProductTourStateComponent />
+      </AppProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Dismiss Tour" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tour-open")).toHaveTextContent("false");
+    });
+    expect(window.localStorage.getItem("gitpulse.productTour.dismissed")).toBe(
+      "true",
+    );
+  });
+
+  it("can reopen and reset the product tour after dismissal", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("gitpulse.productTour.dismissed", "true");
+
+    render(
+      <AppProvider>
+        <ProductTourStateComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("tour-open")).toHaveTextContent("false");
+
+    await user.click(screen.getByRole("button", { name: "Open Tour" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("tour-open")).toHaveTextContent("true");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Dismiss Tour" }));
+    await user.click(screen.getByRole("button", { name: "Reset Tour" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tour-open")).toHaveTextContent("true");
+    });
+    expect(window.localStorage.getItem("gitpulse.productTour.dismissed")).toBeNull();
   });
 });
