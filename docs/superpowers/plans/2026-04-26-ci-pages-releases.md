@@ -64,5 +64,5 @@
 - [x] Run `pnpm run site:build`: passed.
 - [x] Run `cargo test` in `src-tauri`: 133 passed, 1 ignored benchmark.
 - [x] Run `cargo clippy --all-targets -- -D warnings` in `src-tauri`: passed.
-- [ ] Start a local site preview URL.
-- [ ] Push `master` to `origin/master`.
+- [x] Start a local site preview URL: `http://127.0.0.1:4174/`.
+- [x] Push `master` to `origin/master`.
