@@ -1,9 +1,21 @@
 import { useAppContext } from "../context/AppContext";
-import { useDeveloperGlobalStats } from "../hooks/useStats";
+import { useActivityTimeline, useDeveloperGlobalStats, useFileStats } from "../hooks/useStats";
 import { usePauseScan, useResumeScan, useScanStatus, useTriggerScan } from "../hooks/useRepos";
+import ActivityChart from "../components/ActivityChart";
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
-import { RefreshCw, Flame, GitCommit, Clock, AlertCircle, CheckCircle2, Pause, Play } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  FileCode2,
+  Flame,
+  GitCommit,
+  Pause,
+  Play,
+  RefreshCw,
+} from "lucide-react";
+import { activityRowsToChartPoints } from "../utils/dashboard";
 import { timeRangeToQuery } from "../utils/timeRange";
 
 function fmt(n: number): string {
@@ -30,6 +42,8 @@ export default function Dashboard() {
     analysisScope,
     dateRange,
   );
+  const { data: activityRows = [] } = useActivityTimeline(analysisScope, dateRange);
+  const { data: topFiles = [], isLoading: loadingFiles } = useFileStats(repoId, dateRange);
   const scan = useTriggerScan();
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();
@@ -90,6 +104,15 @@ export default function Dashboard() {
 
   const hasAnalysisTarget =
     analysisScopeMode === "workspace" ? workspaceId != null : repoId != null;
+  const activityData = activityRowsToChartPoints(activityRows);
+  const activityTotals = activityRows.reduce(
+    (acc, row) => ({
+      commits: acc.commits + row.commits,
+      insertions: acc.insertions + row.insertions,
+      deletions: acc.deletions + row.deletions,
+    }),
+    { commits: 0, insertions: 0, deletions: 0 },
+  );
 
   const totals = devStats.reduce(
     (acc, d) => ({
@@ -244,6 +267,30 @@ export default function Dashboard() {
             </div>
           </section>
 
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2
+                className="text-sm uppercase tracking-widest text-on-surface-variant"
+                style={{ fontFamily: "Inter, sans-serif" }}
+              >
+                Activity Timeline
+              </h2>
+              <div className="flex gap-3 text-xs text-on-surface-variant">
+                <span>{fmt(activityTotals.commits)} commits</span>
+                <span className="text-tertiary">+{fmt(activityTotals.insertions)}</span>
+                <span className="text-error">-{fmt(activityTotals.deletions)}</span>
+              </div>
+            </div>
+            <div className="bg-surface-container-high rounded-lg px-4 pt-4 pb-2">
+              <ActivityChart
+                data={activityData}
+                valueLabel="Commits"
+                color="#ffb599"
+                height={180}
+              />
+            </div>
+          </section>
+
           {/* Spotlight cards */}
           {(mostRecent || streakHolder) && (
             <section>
@@ -381,6 +428,48 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2
+              className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Top Files
+            </h2>
+            {loadingFiles ? (
+              <div className="text-on-surface-variant text-sm">Loading…</div>
+            ) : topFiles.length === 0 ? (
+              <div className="rounded-lg bg-surface-container-low p-6 text-center text-on-surface-variant text-sm">
+                No file data for the selected repository and range.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                {topFiles.slice(0, 8).map((file) => (
+                  <div
+                    key={file.file_id}
+                    className="flex min-w-0 items-center gap-3 rounded-lg bg-surface-container-high px-4 py-3"
+                    title={file.file_path}
+                  >
+                    <FileCode2 size={15} className="shrink-0 text-on-surface-variant" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-mono text-sm text-on-surface">
+                        {file.file_path}
+                      </p>
+                      <p className="text-xs text-on-surface-variant">
+                        {file.unique_authors} authors · co-touch {file.co_touch_score.toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-primary">
+                        {fmt(file.commit_count)}
+                      </p>
+                      <p className="text-xs text-on-surface-variant">commits</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>
