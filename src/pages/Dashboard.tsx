@@ -1,6 +1,7 @@
 import { useAppContext } from "../context/AppContext";
 import { useActivityTimeline, useDeveloperGlobalStats, useFileStats } from "../hooks/useStats";
 import { usePauseScan, useResumeScan, useScanStatus, useTriggerScan } from "../hooks/useRepos";
+import { useInsights } from "../hooks/useInsights";
 import ActivityChart from "../components/ActivityChart";
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
@@ -20,6 +21,7 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { activityRowsToChartPoints } from "../utils/dashboard";
 import { timeRangeToQuery } from "../utils/timeRange";
 
@@ -52,6 +54,7 @@ export default function Dashboard() {
   );
   const { data: activityRows = [] } = useActivityTimeline(analysisScope, dateRange);
   const { data: topFiles = [], isLoading: loadingFiles } = useFileStats(repoId, dateRange);
+  const { data: insightRows = [] } = useInsights(analysisScope, dateRange);
   const displayedDevStats = isDemoMode ? DEMO_DEVELOPER_STATS : devStats;
   const displayedActivityRows = isDemoMode ? DEMO_ACTIVITY_TIMELINE : activityRows;
   const displayedTopFiles = isDemoMode ? DEMO_TOP_FILES : topFiles;
@@ -291,6 +294,56 @@ export default function Dashboard() {
 
       {hasAnalysisTarget && (
         <>
+          {!isDemoMode && insightRows.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2
+                  className="text-sm uppercase tracking-widest text-on-surface-variant"
+                  style={{ fontFamily: "Inter, sans-serif" }}
+                >
+                  Insights Preview
+                </h2>
+                <Link
+                  to="/insights"
+                  className="rounded-full bg-surface-container-high px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-highest"
+                >
+                  Open Insights
+                </Link>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {insightRows.slice(0, 3).map((insight) => (
+                  <article
+                    key={insight.insight_key}
+                    className="rounded-lg bg-surface-container-low p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-widest text-on-surface-variant">
+                          {insight.category.split("_").join(" ")}
+                        </p>
+                        <h3
+                          className="mt-2 truncate font-bold text-on-surface"
+                          style={{ fontFamily: "Space Grotesk, sans-serif" }}
+                        >
+                          {insight.title}
+                        </h3>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-surface-container-high px-2 py-1 text-xs font-semibold text-primary">
+                        {insight.severity}
+                      </span>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-sm text-on-surface-variant">
+                      {insight.summary}
+                    </p>
+                    <p className="mt-3 truncate font-mono text-xs text-on-surface-variant">
+                      {insight.entity_label}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Summary stats */}
           <section>
             <h2

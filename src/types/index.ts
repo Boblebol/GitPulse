@@ -165,6 +165,20 @@ export interface ActivityTimelineRow {
   files_touched: number;
 }
 
+// ── Insights ─────────────────────────────────────────────────────────────────
+
+export interface InsightRow {
+  insight_key: string;
+  category: string;
+  severity: "info" | "medium" | "high" | string;
+  title: string;
+  summary: string;
+  entity_label: string;
+  metric_value: number;
+  action_label: string;
+  route: string;
+}
+
 // ── Box Score ─────────────────────────────────────────────────────────────────
 
 export interface LeaderboardEntry {
