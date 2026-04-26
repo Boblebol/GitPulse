@@ -179,6 +179,25 @@ export interface InsightRow {
   route: string;
 }
 
+// ── Recaps ───────────────────────────────────────────────────────────────────
+
+export interface WeeklyRecap {
+  week_start: string;
+  week_end: string;
+  scope_label: string;
+  commits: number;
+  insertions: number;
+  deletions: number;
+  active_days: number;
+  top_developer_name: string | null;
+  top_developer_commits: number;
+  top_file_path: string | null;
+  top_file_commits: number;
+  top_insight_title: string | null;
+  top_insight_severity: string | null;
+  markdown: string;
+}
+
 // ── Box Score ─────────────────────────────────────────────────────────────────
 
 export interface LeaderboardEntry {

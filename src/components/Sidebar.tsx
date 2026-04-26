@@ -28,6 +28,7 @@ const NAV = [
   { to: "/boxscore",    label: "Box Score",    Icon: Trophy          },
   { to: "/aliases",     label: "Aliases",      Icon: GitMerge        },
   { to: "/insights",    label: "Insights",     Icon: Lightbulb       },
+  { to: "/weekly-recap", label: "Weekly Recap", Icon: CalendarDays    },
   { to: "/seasons",     label: "Seasons",      Icon: CalendarDays    },
   { to: "/awards",      label: "Awards",       Icon: Award           },
   { to: "/records",     label: "Records",      Icon: History         },
