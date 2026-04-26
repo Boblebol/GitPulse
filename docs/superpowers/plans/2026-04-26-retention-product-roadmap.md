@@ -18,7 +18,7 @@
 |---|---:|---|---|---|
 | `v4.0.0` | `V4-001` | Activation Tour | Shipped in `645fabd` | First-run product tour, persisted dismissal, sidebar reopen entry point. |
 | `v4.1.0` | `V4-002` | Demo Aha Moment | Shipped in `75b9971` | Demo mode, sample Dashboard data, improved no-repo activation state. |
-| `v4.2.0` | `V4-003` | Insights Inbox | Planned | Local insight feed with severity/category labels and Dashboard preview. |
+| `v4.2.0` | `V4-003` | Insights Inbox | Shipped in `69b0262` + `991b4d3` | Local insight feed with severity/category labels and Dashboard preview. |
 | `v4.3.0` | `V4-004` | Weekly Recap | Planned | Weekly repo/workspace recap with copyable Markdown. |
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Planned | Watch files/directories/repos and compare periods. |
 | `v4.5.0` | `V4-006` | Shareable Reports | Planned | Markdown exports for Dashboard, Code Health, and recaps. |
@@ -82,7 +82,7 @@ Release rule: each version must be independently useful, tested, and documented 
 
 **Publishable version:** `v4.2.0`
 
-**Status:** Planned.
+**Status:** Shipped in `69b0262 feat(insights): add local insight command` and `991b4d3 feat(ui): add insights inbox`.
 
 **Outcome:** users have a reason to return after scans.
 
@@ -99,6 +99,22 @@ Release rule: each version must be independently useful, tested, and documented 
 - Backend tests cover each insight category.
 
 **Commit:** `feat(insights): add local insight inbox`
+
+**V4-003 Ticket Breakdown:**
+
+- `V4-003A`: Backend `get_insights(repo_id?, workspace_id?, from_date?, to_date?)` command.
+- `V4-003B`: Frontend `useInsights` hook and `InsightRow` type.
+- `V4-003C`: `Insights` page with category/severity cards.
+- `V4-003D`: Dashboard preview and sidebar route.
+- `V4-003E`: Release status update after verification.
+
+**V4-003 Initial Insight Categories:**
+
+- `hotspot`: high-churn/high-touch files to inspect first.
+- `knowledge_silo`: files owned by too few authors.
+- `review_risk`: large or broad commits that deserve review attention.
+- `coupling`: files with high co-touch signals.
+- `activity`: recent scoped activity summary.
 
 ### Milestone 4: Weekly Recap
 
