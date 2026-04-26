@@ -166,6 +166,85 @@ describe("AppContext", () => {
     });
   });
 
+  it("defaults to repository analysis scope and allows switching to workspace scope", async () => {
+    const user = userEvent.setup();
+
+    function ScopeComponent() {
+      const { analysisScopeMode, setAnalysisScopeMode } = useAppContext();
+      return (
+        <div>
+          <div data-testid="scope-mode">{analysisScopeMode}</div>
+          <button onClick={() => setAnalysisScopeMode("workspace")}>
+            Use Workspace Scope
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AppProvider>
+        <ScopeComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("scope-mode")).toHaveTextContent("repo");
+
+    await user.click(screen.getByRole("button", { name: "Use Workspace Scope" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("scope-mode")).toHaveTextContent("workspace");
+    });
+  });
+
+  it("resets analysis scope to repository when workspace or repo changes", async () => {
+    const user = userEvent.setup();
+
+    function ScopeResetComponent() {
+      const {
+        analysisScopeMode,
+        setAnalysisScopeMode,
+        setWorkspaceId,
+        setRepoId,
+      } = useAppContext();
+      return (
+        <div>
+          <div data-testid="scope-mode">{analysisScopeMode}</div>
+          <button onClick={() => setAnalysisScopeMode("workspace")}>
+            Use Workspace Scope
+          </button>
+          <button onClick={() => setWorkspaceId("ws1")}>Set Workspace</button>
+          <button onClick={() => setRepoId("repo1")}>Set Repo</button>
+        </div>
+      );
+    }
+
+    render(
+      <AppProvider>
+        <ScopeResetComponent />
+      </AppProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Use Workspace Scope" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("scope-mode")).toHaveTextContent("workspace");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Set Workspace" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("scope-mode")).toHaveTextContent("repo");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Use Workspace Scope" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("scope-mode")).toHaveTextContent("workspace");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Set Repo" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("scope-mode")).toHaveTextContent("repo");
+    });
+  });
+
   it("updates scanning and sync status", async () => {
     const user = userEvent.setup();
 

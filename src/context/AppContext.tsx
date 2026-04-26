@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { ScanProgress } from "../types";
+import type { AnalysisScopeMode, ScanProgress } from "../types";
 
 interface Notification {
   id: string;
@@ -12,6 +12,8 @@ interface AppContextValue {
   repoId: string | null;
   setWorkspaceId: (id: string | null) => void;
   setRepoId: (id: string | null) => void;
+  analysisScopeMode: AnalysisScopeMode;
+  setAnalysisScopeMode: (mode: AnalysisScopeMode) => void;
   scanningRepoId: string | null;
   setScanningRepoId: (id: string | null) => void;
   syncStatus: string;
@@ -29,10 +31,22 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [repoId, setRepoId] = useState<string | null>(null);
+  const [analysisScopeMode, setAnalysisScopeModeState] =
+    useState<AnalysisScopeMode>("repo");
   const [scanningRepoId, setScanningRepoId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [scanProgressByRepo, setScanProgressByRepo] = useState<Record<string, ScanProgress>>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const updateWorkspaceId = (id: string | null) => {
+    setWorkspaceId(id);
+    setAnalysisScopeModeState("repo");
+  };
+
+  const updateRepoId = (id: string | null) => {
+    setRepoId(id);
+    setAnalysisScopeModeState("repo");
+  };
 
   const setScanProgress = (progress: ScanProgress) => {
     setScanProgressByRepo((prev) => ({
@@ -69,8 +83,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         workspaceId,
         repoId,
-        setWorkspaceId,
-        setRepoId,
+        setWorkspaceId: updateWorkspaceId,
+        setRepoId: updateRepoId,
+        analysisScopeMode,
+        setAnalysisScopeMode: setAnalysisScopeModeState,
         scanningRepoId,
         setScanningRepoId,
         syncStatus,

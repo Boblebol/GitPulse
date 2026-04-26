@@ -36,6 +36,16 @@ export interface ScanProgress {
   error?: string;
 }
 
+// ── Analysis Scope ───────────────────────────────────────────────────────────
+
+export type AnalysisScopeMode = "repo" | "workspace";
+
+export interface AnalysisScope {
+  mode: AnalysisScopeMode;
+  repo_id: string | null;
+  workspace_id: string | null;
+}
+
 // ── Developers & Aliases ──────────────────────────────────────────────────────
 
 export interface Developer {

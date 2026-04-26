@@ -11,6 +11,7 @@ import {
 import { useWorkspaces } from "../hooks/useRepos";
 import { useRepos } from "../hooks/useRepos";
 import { useAppContext } from "../context/AppContext";
+import AnalysisScopeToggle from "./AnalysisScopeToggle";
 
 const NAV = [
   { to: "/",            label: "Dashboard",    Icon: LayoutDashboard },
@@ -22,7 +23,14 @@ const NAV = [
 ];
 
 export default function Sidebar() {
-  const { workspaceId, repoId, setWorkspaceId, setRepoId } = useAppContext();
+  const {
+    workspaceId,
+    repoId,
+    setWorkspaceId,
+    setRepoId,
+    analysisScopeMode,
+    setAnalysisScopeMode,
+  } = useAppContext();
   const { data: workspaces = [] } = useWorkspaces();
   const { data: repos = [] } = useRepos(workspaceId);
 
@@ -95,6 +103,15 @@ export default function Sidebar() {
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-on-surface-variant mb-1 block">Stats Scope</label>
+          <AnalysisScopeToggle
+            mode={analysisScopeMode}
+            onChange={setAnalysisScopeMode}
+            disabled={!workspaceId}
+          />
         </div>
       </div>
     </aside>
