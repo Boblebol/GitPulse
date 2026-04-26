@@ -25,7 +25,8 @@
 | `v4.6.0` | `V4-007` | Achievements Polish | Shipped in `01e841d` + `c6e9560` | Positive code-health achievements with ignorable local nudges. |
 | `v0.2.0-rc.1` | `V4-008` | Open Source Release Candidate | Shipped in `bc34aec` | OSS hygiene, RC versions, changelog, and prerelease workflow. |
 | `v0.2.0-rc.2` | `V4-009` | Public Downloads Release Candidate | Superseded by `v0.2.0-rc.3` | Published prereleases and desktop artifacts from CI. |
-| `v0.2.0-rc.3` | `V4-010` | Pages And Windows RC Fix | In progress | Pages auto-enablement and MSI-compatible RC app version. |
+| `v0.2.0-rc.3` | `V4-010` | Pages And Windows RC Fix | Superseded by `v0.2.0-rc.4` | Pages auto-enablement and MSI-compatible RC app version. |
+| `v0.2.0-rc.4` | `V4-011` | Release Asset Publishing Fix | Prepared for tag | Upload assets to a draft release before publishing. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
 
@@ -317,7 +318,7 @@ desktop builds.
 
 **Publishable version:** `v0.2.0-rc.3`
 
-**Status:** In progress.
+**Status:** Prepared for `v0.2.0-rc.4` tag.
 
 **Outcome:** GitHub Pages deploys from Actions and Windows MSI bundles build
 for the release candidate.
@@ -335,6 +336,30 @@ for the release candidate.
 - Release downloads are visible from the prerelease page.
 
 **Commit:** `ci: fix pages and windows rc bundles`
+
+### Milestone 11: Release Asset Publishing Fix
+
+**Ticket:** `V4-011`
+
+**Publishable version:** `v0.2.0-rc.4`
+
+**Status:** In progress.
+
+**Outcome:** platform bundles are attached before the GitHub prerelease becomes
+visible.
+
+**Scope:**
+
+- Keep `tauri-action` releases as drafts during matrix asset uploads.
+- Publish the release only after all platform jobs complete.
+- Keep the Tauri app version MSI-compatible with `0.2.0-4`.
+
+**Acceptance:**
+
+- Linux, macOS, and Windows assets upload without immutable-release errors.
+- The prerelease is visible only after assets are attached.
+
+**Commit:** `ci: publish release after asset upload`
 
 ---
 

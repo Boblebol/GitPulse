@@ -74,5 +74,22 @@ jobs:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: GitPulse ${{ env.RELEASE_TAG }}
           releaseBody: See CHANGELOG.md for release notes and upgrade notes.
-          releaseDraft: false
+          releaseDraft: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-rc.') }}
+
+  publish:
+    name: Publish release after assets upload
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          if [[ "$RELEASE_TAG" == *"-rc."* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi

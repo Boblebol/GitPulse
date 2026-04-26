@@ -10,7 +10,7 @@ This document describes how to publish GitPulse desktop releases from the
 - Release candidates are created from Git tags named `vX.Y.Z-rc.N`.
 - `CHANGELOG.md` is edited manually before a tag is created.
 - The GitHub Actions release workflow publishes a GitHub Release or prerelease
-  and uploads packaged Tauri artifacts.
+  after uploading packaged Tauri artifacts to a draft release.
 - The `Desktop Build` workflow also runs on every `master` push and uploads
   temporary downloadable artifacts for validation.
 
@@ -45,8 +45,8 @@ This document describes how to publish GitPulse desktop releases from the
 
    The Tauri app version in `src-tauri/tauri.conf.json` must remain compatible
    with Windows MSI packaging. For release candidates, use a numeric-only
-   prerelease identifier such as `0.2.0-3` while the Git tag remains
-   `v0.2.0-rc.3`.
+   prerelease identifier such as `0.2.0-4` while the Git tag remains
+   `v0.2.0-rc.4`.
 
 4. Run local verification:
 
