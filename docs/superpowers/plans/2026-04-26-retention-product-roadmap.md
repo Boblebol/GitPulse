@@ -17,7 +17,7 @@
 | Version | Ticket | Release Name | Status | Publishable Scope |
 |---|---:|---|---|---|
 | `v4.0.0` | `V4-001` | Activation Tour | Shipped in `645fabd` | First-run product tour, persisted dismissal, sidebar reopen entry point. |
-| `v4.1.0` | `V4-002` | Demo Aha Moment | Next | Demo mode, sample Dashboard data, improved no-repo activation state. |
+| `v4.1.0` | `V4-002` | Demo Aha Moment | Shipped in `75b9971` | Demo mode, sample Dashboard data, improved no-repo activation state. |
 | `v4.2.0` | `V4-003` | Insights Inbox | Planned | Local insight feed with severity/category labels and Dashboard preview. |
 | `v4.3.0` | `V4-004` | Weekly Recap | Planned | Weekly repo/workspace recap with copyable Markdown. |
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Planned | Watch files/directories/repos and compare periods. |
@@ -58,7 +58,7 @@ Release rule: each version must be independently useful, tested, and documented 
 
 **Publishable version:** `v4.1.0`
 
-**Status:** In progress.
+**Status:** Shipped in `75b9971 feat(onboarding): add demo mode`.
 
 **Outcome:** users can experience GitPulse before connecting a real repository.
 
