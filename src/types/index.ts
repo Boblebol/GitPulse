@@ -65,6 +65,20 @@ export interface TimeRange {
   toDate: string | null;
 }
 
+// ── Historical Periods ───────────────────────────────────────────────────────
+
+export type PeriodType =
+  | "month"
+  | "quarter"
+  | "calendar_year"
+  | "season"
+  | "all_time";
+
+export interface PeriodSelection {
+  periodType: PeriodType;
+  periodKey: string;
+}
+
 // ── Developers & Aliases ──────────────────────────────────────────────────────
 
 export interface Developer {
@@ -163,4 +177,71 @@ export interface LeaderboardEntry {
   total_player_score: number;
   active_days: number;
   best_streak: number;
+}
+
+// ── V3 Historical Analytics ──────────────────────────────────────────────────
+
+export interface PeriodLeaderboardRow {
+  rank: number;
+  developer_id: string;
+  developer_name: string;
+  total_commits: number;
+  total_insertions: number;
+  total_deletions: number;
+  files_touched: number;
+  active_days: number;
+  best_streak: number;
+  total_player_score: number;
+  avg_player_score: number;
+  adder_rank: number;
+  remover_rank: number;
+}
+
+export interface PeriodAwardRow {
+  award_key: string;
+  title: string;
+  winner_developer_id: string;
+  winner_developer_name: string;
+  metric_value: number;
+  explanation: string;
+}
+
+export interface HistoricalRecordRow {
+  record_key: string;
+  title: string;
+  holder_id: string | null;
+  holder_name: string | null;
+  value: number;
+  date: string | null;
+  period_key: string | null;
+  explanation: string;
+}
+
+// ── V3 Code Health ───────────────────────────────────────────────────────────
+
+export interface FileHealthRow {
+  file_id: string;
+  file_path: string;
+  recent_commits: number;
+  churn_score: number;
+  co_touch_score: number;
+  unique_authors: number;
+  hotspot_score: number;
+  primary_owner_id: string | null;
+  primary_owner_name: string | null;
+  primary_owner_share: number;
+  active_maintainers: number;
+  bus_factor: number;
+  silo_risk: boolean;
+}
+
+export interface DirectoryHealthRow {
+  directory_path: string;
+  files_touched: number;
+  commit_count: number;
+  unique_authors: number;
+  hotspot_file_count: number;
+  silo_file_count: number;
+  churn_score: number;
+  directory_health_score: number;
 }

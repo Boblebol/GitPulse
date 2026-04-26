@@ -5,6 +5,10 @@ import {
   FileCode2,
   Trophy,
   GitMerge,
+  CalendarDays,
+  Award,
+  History,
+  HeartPulse,
   Settings,
   Zap,
 } from "lucide-react";
@@ -19,6 +23,10 @@ const NAV = [
   { to: "/files",       label: "Files",        Icon: FileCode2       },
   { to: "/boxscore",    label: "Box Score",    Icon: Trophy          },
   { to: "/aliases",     label: "Aliases",      Icon: GitMerge        },
+  { to: "/seasons",     label: "Seasons",      Icon: CalendarDays    },
+  { to: "/awards",      label: "Awards",       Icon: Award           },
+  { to: "/records",     label: "Records",      Icon: History         },
+  { to: "/health",      label: "Code Health",  Icon: HeartPulse      },
   { to: "/settings",    label: "Settings",     Icon: Settings        },
 ];
 

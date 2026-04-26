@@ -7,6 +7,10 @@ const Developers = lazy(() => import("./pages/Developers"));
 const Files = lazy(() => import("./pages/Files"));
 const BoxScore = lazy(() => import("./pages/BoxScore"));
 const AliasManager = lazy(() => import("./pages/AliasManager"));
+const Seasons = lazy(() => import("./pages/Seasons"));
+const Awards = lazy(() => import("./pages/Awards"));
+const Records = lazy(() => import("./pages/Records"));
+const CodeHealth = lazy(() => import("./pages/CodeHealth"));
 const Settings = lazy(() => import("./pages/Settings"));
 
 function RouteFallback() {
@@ -31,6 +35,10 @@ const router = createHashRouter([
       { path: "files", element: route(<Files />) },
       { path: "boxscore", element: route(<BoxScore />) },
       { path: "aliases", element: route(<AliasManager />) },
+      { path: "seasons", element: route(<Seasons />) },
+      { path: "awards", element: route(<Awards />) },
+      { path: "records", element: route(<Records />) },
+      { path: "health", element: route(<CodeHealth />) },
       { path: "settings", element: route(<Settings />) },
     ],
   },
