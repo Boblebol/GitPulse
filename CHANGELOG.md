@@ -15,6 +15,8 @@ named `vX.Y.Z`.
   current-vs-previous period deltas for activity and code-area signals.
 - Shareable Reports page with deterministic Markdown exports for Dashboard,
   Code Health, and Weekly Recap views.
+- Achievements page for positive code-health improvements such as cooled
+  hotspots, knowledge spread, lower volatility, and cleanup-heavy periods.
 - GitHub Pages documentation site covering the product, architecture, tutorials,
   build instructions, releases, and changelog.
 - GitHub Actions CI for frontend tests, frontend build, site build, Rust tests,

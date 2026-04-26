@@ -11,6 +11,7 @@ import {
   MonitorDown,
   Rocket,
   ShieldCheck,
+  Sparkles,
   Terminal,
   Users,
   Workflow,
@@ -62,6 +63,11 @@ const features = [
     text: "Copy deterministic Markdown for Dashboard, Code Health, and Weekly Recap updates without sending data anywhere.",
   },
   {
+    icon: <Sparkles size={22} />,
+    title: "Code health achievements",
+    text: "Surface cooled hotspots, knowledge spread, lower volatility, and cleanup periods without ranking individual output.",
+  },
+  {
     icon: <Boxes size={22} />,
     title: "Box scores",
     text: "Turn daily activity into player-style scorecards with an editable formula stored in SQLite.",
@@ -108,6 +114,10 @@ const tutorials = [
     steps: ["Select the repo or workspace scope.", "Open Reports.", "Pick Dashboard, Code Health, or Weekly Recap.", "Copy the generated Markdown into your update."],
   },
   {
+    title: "Review achievements",
+    steps: ["Select a bounded time range.", "Open Achievements.", "Review code health wins.", "Ignore any nudge that is not useful for the current workflow."],
+  },
+  {
     title: "Switch branches",
     steps: ["Open Settings.", "Pick a branch in the repository row.", "Sync again to scan commits for that branch cursor."],
   },
@@ -147,6 +157,7 @@ function ProductPreview() {
         <span>Developers</span>
         <span>Box Scores</span>
         <span>Aliases</span>
+        <span>Achievements</span>
       </div>
       <div className="preview-main">
         <div className="preview-top">
@@ -168,9 +179,9 @@ function ProductPreview() {
           <span style={{ height: "79%" }} />
         </div>
         <div className="preview-list">
+          <div><span>Hotspot cooled down</span><strong>impact 3</strong></div>
           <div><span>src/scanner.rs</span><strong>co-touch 18</strong></div>
           <div><span>Dashboard.tsx</span><strong>churn 12.4</strong></div>
-          <div><span>stats.rs</span><strong>9 authors</strong></div>
         </div>
       </div>
     </div>

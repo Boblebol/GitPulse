@@ -5,7 +5,8 @@
 
 GitPulse is a local Tauri 2 desktop app for analyzing Git repository activity.
 It indexes local repositories into SQLite, aggregates developer/file/directory
-stats, and presents an NBA box-score style view of work patterns.
+stats, highlights code-health achievements, and presents an NBA box-score style
+view of work patterns.
 
 Public documentation and tutorials are published with GitHub Pages:
 https://Boblebol.github.io/GitPulse/

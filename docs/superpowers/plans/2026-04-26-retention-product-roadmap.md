@@ -22,7 +22,7 @@
 | `v4.3.0` | `V4-004` | Weekly Recap | Shipped in `c433f7d` + `40cba73` | Weekly repo/workspace recap with copyable Markdown. |
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Shipped in `9fb7d4c` + `9f0bbbb` + `0d06ed3` | Watch files/directories/repos and compare periods. |
 | `v4.5.0` | `V4-006` | Shareable Reports | Shipped in `b3788b8` + `276a4e6` | Markdown exports for Dashboard, Code Health, and recaps. |
-| `v4.6.0` | `V4-007` | Achievements Polish | Planned | Positive code-health achievements and HOF refinements. |
+| `v4.6.0` | `V4-007` | Achievements Polish | Shipped in `01e841d` + `c6e9560` | Positive code-health achievements with ignorable local nudges. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
 
@@ -237,20 +237,21 @@ Release rule: each version must be independently useful, tested, and documented 
 
 **Publishable version:** `v4.6.0`
 
-**Status:** Planned.
+**Status:** Shipped in `01e841d feat(achievements): add code health signals` and `c6e9560 feat(ui): add achievements page`.
 
 **Outcome:** the app feels alive without becoming noisy.
 
 **Scope:**
 
-- HOF refinements and positive code-health achievements.
-- "Hotspot cooled down", "bus factor improved", "knowledge spread", "cleanup week".
-- Optional reminder preferences once recaps exist.
+- Positive code-health achievements derived from current vs previous periods.
+- "Hotspot cooled down", "knowledge spread", "volatility reduced", "cleanup week".
+- Local ignore/show ignored workflow for non-critical achievement nudges.
 
 **Acceptance:**
 
 - Achievements reward codebase improvements, not raw individual output.
 - Users can ignore/disable non-critical nudges.
+- Tests cover the achievement engine and the Achievements page dismissal flow.
 
 **Commit:** `feat(achievements): add code health achievements`
 
