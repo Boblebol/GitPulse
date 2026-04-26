@@ -97,7 +97,10 @@ GITPULSE_BENCH_COMMITS=5000 GITPULSE_BENCH_FILES_PER_COMMIT=3 \
 Releases are prepared from the `master` branch and published by pushing tags
 named `vX.Y.Z` or release-candidate tags such as `vX.Y.Z-rc.N`. The release
 workflow builds Linux, macOS, and Windows desktop artifacts, then attaches them
-to a draft GitHub Release.
+to a public GitHub Release or prerelease.
+
+Desktop bundles are also built on every `master` push by the `Desktop Build`
+workflow and can be downloaded from the workflow run artifacts for 14 days.
 
 See [docs/release.md](docs/release.md) and [CHANGELOG.md](CHANGELOG.md).
 

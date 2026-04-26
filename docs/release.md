@@ -9,8 +9,10 @@ This document describes how to publish GitPulse desktop releases from the
 - Stable releases are created from Git tags named `vX.Y.Z`.
 - Release candidates are created from Git tags named `vX.Y.Z-rc.N`.
 - `CHANGELOG.md` is edited manually before a tag is created.
-- The GitHub Actions release workflow creates a draft GitHub Release and uploads
-  packaged Tauri artifacts.
+- The GitHub Actions release workflow publishes a GitHub Release or prerelease
+  and uploads packaged Tauri artifacts.
+- The `Desktop Build` workflow also runs on every `master` push and uploads
+  temporary downloadable artifacts for validation.
 
 ## Prepare A Release
 
@@ -94,9 +96,17 @@ This document describes how to publish GitPulse desktop releases from the
 
 3. Wait for the `Release` workflow to finish.
 
-4. Open the draft GitHub Release, review generated assets, paste or refine
-   release notes from `CHANGELOG.md`, then publish the release. Tags containing
-   `-rc.` are marked as prereleases by the workflow.
+4. Open the GitHub Release or prerelease, review generated assets, and refine
+   release notes from `CHANGELOG.md` if needed. Tags containing `-rc.` are
+   marked as prereleases by the workflow.
+
+## Find Downloads
+
+- For tagged builds, open GitHub Releases and select the matching tag, for
+  example `v0.2.0-rc.2`. Desktop bundles are attached to that release.
+- For untagged `master` builds, open GitHub Actions, select `Desktop Build`,
+  open the latest successful run, and download the `gitpulse-linux`,
+  `gitpulse-macos`, or `gitpulse-windows` artifact.
 
 ## Manual Desktop Builds
 

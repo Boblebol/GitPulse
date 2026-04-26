@@ -1,6 +1,8 @@
 name: Desktop Build
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -68,4 +70,5 @@ jobs:
             src-tauri/target/release/bundle/macos/*.app.tar.gz
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 14

@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing Git tag to publish, for example v0.2.0-rc.1.
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -27,6 +36,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Linux Tauri dependencies
         if: matrix.platform == 'linux'
@@ -60,8 +71,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: GitPulse ${{ github.ref_name }}
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: GitPulse ${{ env.RELEASE_TAG }}
           releaseBody: See CHANGELOG.md for release notes and upgrade notes.
-          releaseDraft: true
-          prerelease: ${{ contains(github.ref_name, '-rc.') }}
+          releaseDraft: false
+          prerelease: ${{ contains(env.RELEASE_TAG, '-rc.') }}

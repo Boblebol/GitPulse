@@ -9,6 +9,16 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 No unreleased changes yet.
 
+## [0.2.0-rc.2] - 2026-04-26
+
+### Changed
+
+- Desktop Build now runs on every `master` push and uploads Linux, macOS, and
+  Windows bundles as GitHub Actions artifacts.
+- Release tags now publish visible GitHub prereleases/releases instead of draft
+  releases, so app downloads are available from the release page.
+- Release workflow can also be run manually for an existing tag.
+
 ## [0.2.0-rc.1] - 2026-04-26
 
 ### Added
@@ -51,6 +61,7 @@ No unreleased changes yet.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.1...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.2...HEAD
+[0.2.0-rc.2]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/Boblebol/GitPulse/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/Boblebol/GitPulse/releases/tag/v0.1.0

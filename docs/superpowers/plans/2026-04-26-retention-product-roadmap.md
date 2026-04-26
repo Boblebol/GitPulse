@@ -23,7 +23,8 @@
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Shipped in `9fb7d4c` + `9f0bbbb` + `0d06ed3` | Watch files/directories/repos and compare periods. |
 | `v4.5.0` | `V4-006` | Shareable Reports | Shipped in `b3788b8` + `276a4e6` | Markdown exports for Dashboard, Code Health, and recaps. |
 | `v4.6.0` | `V4-007` | Achievements Polish | Shipped in `01e841d` + `c6e9560` | Positive code-health achievements with ignorable local nudges. |
-| `v0.2.0-rc.1` | `V4-008` | Open Source Release Candidate | Prepared for tag | OSS hygiene, RC versions, changelog, and prerelease workflow. |
+| `v0.2.0-rc.1` | `V4-008` | Open Source Release Candidate | Shipped in `bc34aec` | OSS hygiene, RC versions, changelog, and prerelease workflow. |
+| `v0.2.0-rc.2` | `V4-009` | Public Downloads Release Candidate | Prepared for tag | Published prereleases and desktop artifacts from CI. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
 
@@ -282,6 +283,32 @@ desktop builds.
 - `v0.2.0-rc.1` creates a draft prerelease with desktop artifacts.
 
 **Commit:** `chore(release): prepare v0.2.0-rc.1`
+
+### Milestone 9: Public Downloads Release Candidate
+
+**Ticket:** `V4-009`
+
+**Publishable version:** `v0.2.0-rc.2`
+
+**Status:** Prepared for `v0.2.0-rc.2` tag.
+
+**Outcome:** public users can find app downloads from releases and CI artifacts.
+
+**Scope:**
+
+- Publish `v*` release workflow outputs instead of hiding them in drafts.
+- Mark `-rc.` tags as prereleases.
+- Allow manual release workflow dispatch for an existing tag.
+- Run Desktop Build on `master` and upload per-platform artifacts.
+- Document where to find release downloads and CI artifacts.
+
+**Acceptance:**
+
+- `v0.2.0-rc.2` creates a visible prerelease with app bundles.
+- `Desktop Build` produces downloadable Actions artifacts on `master`.
+- Pages workflow is retriggered after the repository is public.
+
+**Commit:** `ci: publish desktop release downloads`
 
 ---
 
