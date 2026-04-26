@@ -179,6 +179,19 @@ export interface InsightRow {
   route: string;
 }
 
+// ── Achievements ─────────────────────────────────────────────────────────────
+
+export type AchievementTone = "positive" | "neutral";
+
+export interface AchievementRow {
+  achievement_key: string;
+  title: string;
+  summary: string;
+  metric_value: number;
+  tone: AchievementTone;
+  route: string;
+}
+
 // ── Recaps ───────────────────────────────────────────────────────────────────
 
 export interface WeeklyRecap {
