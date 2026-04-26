@@ -52,6 +52,11 @@ const features = [
     text: "Regenerate a weekly repo or workspace summary and copy deterministic Markdown for reviews or OSS updates.",
   },
   {
+    icon: <ShieldCheck size={22} />,
+    title: "Watchlists & compare",
+    text: "Track important repos, files, or directories and compare current activity against the previous period.",
+  },
+  {
     icon: <Boxes size={22} />,
     title: "Box scores",
     text: "Turn daily activity into player-style scorecards with an editable formula stored in SQLite.",
@@ -88,6 +93,10 @@ const tutorials = [
   {
     title: "Prepare a weekly recap",
     steps: ["Select a repo or switch to workspace scope.", "Open Weekly Recap.", "Pick the week to regenerate.", "Copy the Markdown into a review note or release update."],
+  },
+  {
+    title: "Track code areas",
+    steps: ["Open Watchlists.", "Add a file, directory, or selected repo.", "Use a bounded time range.", "Review commits, churn, hotspot, silo, and volatility deltas."],
   },
   {
     title: "Switch branches",

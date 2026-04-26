@@ -11,6 +11,8 @@ named `vX.Y.Z`.
 
 - Weekly Recap command and UI for selected repositories or workspaces, with
   previous-week regeneration and copyable Markdown.
+- Watchlists & Compare page with local tracked repos/files/directories and
+  current-vs-previous period deltas for activity and code-area signals.
 - GitHub Pages documentation site covering the product, architecture, tutorials,
   build instructions, releases, and changelog.
 - GitHub Actions CI for frontend tests, frontend build, site build, Rust tests,

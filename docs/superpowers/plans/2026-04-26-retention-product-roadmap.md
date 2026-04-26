@@ -20,7 +20,7 @@
 | `v4.1.0` | `V4-002` | Demo Aha Moment | Shipped in `75b9971` | Demo mode, sample Dashboard data, improved no-repo activation state. |
 | `v4.2.0` | `V4-003` | Insights Inbox | Shipped in `69b0262` + `991b4d3` | Local insight feed with severity/category labels and Dashboard preview. |
 | `v4.3.0` | `V4-004` | Weekly Recap | Shipped in `c433f7d` + `40cba73` | Weekly repo/workspace recap with copyable Markdown. |
-| `v4.4.0` | `V4-005` | Watchlists And Compare | Planned | Watch files/directories/repos and compare periods. |
+| `v4.4.0` | `V4-005` | Watchlists And Compare | Shipped in `9fb7d4c` + `9f0bbbb` + `0d06ed3` | Watch files/directories/repos and compare periods. |
 | `v4.5.0` | `V4-006` | Shareable Reports | Planned | Markdown exports for Dashboard, Code Health, and recaps. |
 | `v4.6.0` | `V4-007` | Achievements Polish | Planned | Positive code-health achievements and HOF refinements. |
 
@@ -161,7 +161,7 @@ Release rule: each version must be independently useful, tested, and documented 
 
 **Publishable version:** `v4.4.0`
 
-**Status:** Planned.
+**Status:** Shipped in `9fb7d4c feat(watchlists): add local watchlist storage`, `9f0bbbb feat(compare): add period delta helpers`, and `0d06ed3 feat(ui): add watchlists compare page`.
 
 **Outcome:** users track the parts of the codebase they care about.
 
@@ -178,6 +178,20 @@ Release rule: each version must be independently useful, tested, and documented 
 - Tests cover persistence and delta formulas.
 
 **Commit:** `feat(watchlists): add tracked code areas`
+
+**V4-005 Ticket Breakdown:**
+
+- `V4-005A`: Local watchlist model, storage helpers, and React hook.
+- `V4-005B`: Previous-period helper and metric delta helpers.
+- `V4-005C`: `Watchlists & Compare` page with manual tracked files/directories/repos.
+- `V4-005D`: Sidebar and route entry point.
+- `V4-005E`: Release status update after verification.
+
+**V4-005 Initial Compare Metrics:**
+
+- `activity`: commits, churn, and files touched vs previous period.
+- `code area`: hotspot proxy, silo risk proxy, and volatile file count for selected repo.
+- `tracking`: persisted local watchlist scoped to selected repo/workspace.
 
 ### Milestone 6: Shareable Reports
 
