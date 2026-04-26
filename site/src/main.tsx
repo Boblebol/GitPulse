@@ -57,6 +57,11 @@ const features = [
     text: "Track important repos, files, or directories and compare current activity against the previous period.",
   },
   {
+    icon: <BookOpen size={22} />,
+    title: "Shareable reports",
+    text: "Copy deterministic Markdown for Dashboard, Code Health, and Weekly Recap updates without sending data anywhere.",
+  },
+  {
     icon: <Boxes size={22} />,
     title: "Box scores",
     text: "Turn daily activity into player-style scorecards with an editable formula stored in SQLite.",
@@ -97,6 +102,10 @@ const tutorials = [
   {
     title: "Track code areas",
     steps: ["Open Watchlists.", "Add a file, directory, or selected repo.", "Use a bounded time range.", "Review commits, churn, hotspot, silo, and volatility deltas."],
+  },
+  {
+    title: "Share a report",
+    steps: ["Select the repo or workspace scope.", "Open Reports.", "Pick Dashboard, Code Health, or Weekly Recap.", "Copy the generated Markdown into your update."],
   },
   {
     title: "Switch branches",

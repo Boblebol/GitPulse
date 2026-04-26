@@ -21,7 +21,7 @@
 | `v4.2.0` | `V4-003` | Insights Inbox | Shipped in `69b0262` + `991b4d3` | Local insight feed with severity/category labels and Dashboard preview. |
 | `v4.3.0` | `V4-004` | Weekly Recap | Shipped in `c433f7d` + `40cba73` | Weekly repo/workspace recap with copyable Markdown. |
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Shipped in `9fb7d4c` + `9f0bbbb` + `0d06ed3` | Watch files/directories/repos and compare periods. |
-| `v4.5.0` | `V4-006` | Shareable Reports | Planned | Markdown exports for Dashboard, Code Health, and recaps. |
+| `v4.5.0` | `V4-006` | Shareable Reports | Shipped in `b3788b8` + `276a4e6` | Markdown exports for Dashboard, Code Health, and recaps. |
 | `v4.6.0` | `V4-007` | Achievements Polish | Planned | Positive code-health achievements and HOF refinements. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
@@ -199,7 +199,7 @@ Release rule: each version must be independently useful, tested, and documented 
 
 **Publishable version:** `v4.5.0`
 
-**Status:** Planned.
+**Status:** Shipped in `b3788b8 feat(exports): add markdown report serializers` and `276a4e6 feat(ui): add shareable reports page`.
 
 **Outcome:** users can bring GitPulse into retros, standups, OSS updates, and handoffs.
 
@@ -216,6 +216,20 @@ Release rule: each version must be independently useful, tested, and documented 
 - Tests cover Markdown serializers.
 
 **Commit:** `feat(exports): add markdown reports`
+
+**V4-006 Ticket Breakdown:**
+
+- `V4-006A`: Deterministic Markdown serializers for Dashboard and Code Health reports.
+- `V4-006B`: Reports page with Dashboard, Code Health, and Weekly Recap modes.
+- `V4-006C`: Copy-to-clipboard Markdown workflow.
+- `V4-006D`: Sidebar and route entry point.
+- `V4-006E`: Release status update after verification.
+
+**V4-006 Initial Report Types:**
+
+- `dashboard`: activity totals, top developers, top files.
+- `code_health`: hotspot proxy, silo risk proxy, volatile files, hot file table.
+- `weekly`: existing Weekly Recap Markdown for the selected week.
 
 ### Milestone 7: Habit And Delight Polish
 

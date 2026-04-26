@@ -13,6 +13,8 @@ named `vX.Y.Z`.
   previous-week regeneration and copyable Markdown.
 - Watchlists & Compare page with local tracked repos/files/directories and
   current-vs-previous period deltas for activity and code-area signals.
+- Shareable Reports page with deterministic Markdown exports for Dashboard,
+  Code Health, and Weekly Recap views.
 - GitHub Pages documentation site covering the product, architecture, tutorials,
   build instructions, releases, and changelog.
 - GitHub Actions CI for frontend tests, frontend build, site build, Rust tests,
