@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Award,
   History,
+  Medal,
   HeartPulse,
   Settings,
   Zap,
@@ -26,6 +27,7 @@ const NAV = [
   { to: "/seasons",     label: "Seasons",      Icon: CalendarDays    },
   { to: "/awards",      label: "Awards",       Icon: Award           },
   { to: "/records",     label: "Records",      Icon: History         },
+  { to: "/hall-of-fame", label: "Hall of Fame", Icon: Medal           },
   { to: "/health",      label: "Code Health",  Icon: HeartPulse      },
   { to: "/settings",    label: "Settings",     Icon: Settings        },
 ];

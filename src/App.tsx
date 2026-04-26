@@ -10,6 +10,7 @@ const AliasManager = lazy(() => import("./pages/AliasManager"));
 const Seasons = lazy(() => import("./pages/Seasons"));
 const Awards = lazy(() => import("./pages/Awards"));
 const Records = lazy(() => import("./pages/Records"));
+const HallOfFame = lazy(() => import("./pages/HallOfFame"));
 const CodeHealth = lazy(() => import("./pages/CodeHealth"));
 const Settings = lazy(() => import("./pages/Settings"));
 
@@ -38,6 +39,7 @@ const router = createHashRouter([
       { path: "seasons", element: route(<Seasons />) },
       { path: "awards", element: route(<Awards />) },
       { path: "records", element: route(<Records />) },
+      { path: "hall-of-fame", element: route(<HallOfFame />) },
       { path: "health", element: route(<CodeHealth />) },
       { path: "settings", element: route(<Settings />) },
     ],

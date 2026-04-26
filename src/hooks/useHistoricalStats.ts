@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AnalysisScope,
+  HallOfFameEntry,
   HistoricalRecordRow,
   PeriodAwardRow,
   PeriodLeaderboardRow,
@@ -81,5 +82,20 @@ export function useHistoricalRecords(
     ],
     queryFn: () => invoke("get_historical_records", periodParams(scope, period)),
     enabled: periodQueryEnabled(scope, period),
+  });
+}
+
+export function useHallOfFame(scope: HistoricalScope) {
+  const repoId = scope.repoId ?? null;
+  const workspaceId = scope.workspaceId ?? null;
+
+  return useQuery<HallOfFameEntry[]>({
+    queryKey: ["hall_of_fame", repoId, workspaceId],
+    queryFn: () =>
+      invoke("get_hall_of_fame", {
+        repoId,
+        workspaceId,
+      }),
+    enabled: hasScope(scope),
   });
 }

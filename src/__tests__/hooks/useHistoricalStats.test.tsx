@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import {
+  useHallOfFame,
   useHistoricalRecords,
   usePeriodAwards,
   usePeriodLeaderboard,
@@ -119,6 +120,39 @@ describe("useHistoricalStats hooks", () => {
     ).toBeDefined();
   });
 
+  it("fetches hall of fame entries with scope params", async () => {
+    const rows = [
+      {
+        category_key: "career_commits",
+        title: "All-Time Commit Leader",
+        developer_id: "dev1",
+        developer_name: "Ada",
+        value: 42,
+        highlight: "42 commits",
+      },
+    ];
+    (invoke as jest.Mock).mockResolvedValue(rows);
+
+    const { result } = renderHook(() => useHallOfFame(scope), {
+      wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual(rows);
+    expect(invoke).toHaveBeenCalledWith("get_hall_of_fame", {
+      repoId: "repo1",
+      workspaceId: null,
+    });
+    expect(
+      queryClient.getQueryCache().find({
+        queryKey: ["hall_of_fame", "repo1", null],
+      }),
+    ).toBeDefined();
+  });
+
   it("does not fetch period queries when scope is missing", () => {
     const missingScope: AnalysisScope = {
       mode: "repo",
@@ -138,10 +172,15 @@ describe("useHistoricalStats hooks", () => {
       () => useHistoricalRecords(missingScope, period),
       { wrapper },
     );
+    const { result: hallOfFame } = renderHook(
+      () => useHallOfFame(missingScope),
+      { wrapper },
+    );
 
     expect(leaderboard.current.isLoading).toBe(false);
     expect(awards.current.isLoading).toBe(false);
     expect(records.current.isLoading).toBe(false);
+    expect(hallOfFame.current.isLoading).toBe(false);
     expect(invoke).not.toHaveBeenCalled();
   });
 });

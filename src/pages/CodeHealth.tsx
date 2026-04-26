@@ -2,8 +2,13 @@ import { useState } from "react";
 import StatCard from "../components/StatCard";
 import { useAppContext } from "../context/AppContext";
 import {
+  useActivitySignalStats,
+  useDeveloperFocusStats,
   useDirectoryHealthStats,
+  useFileCouplingGraph,
   useFileHealthStats,
+  useFileVolatilityStats,
+  useReviewRiskCommits,
 } from "../hooks/useCodeHealth";
 import type { PeriodSelection, PeriodType } from "../types";
 
@@ -42,6 +47,12 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatMetric(value: number): string {
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: value >= 10 ? 0 : 1,
+  });
+}
+
 export default function CodeHealth() {
   const { repoId } = useAppContext();
   const [period, setPeriod] = useState<PeriodSelection>(() => currentPeriod());
@@ -51,8 +62,24 @@ export default function CodeHealth() {
   );
   const { data: directories = [], isLoading: loadingDirectories } =
     useDirectoryHealthStats(repoId, period);
+  const { data: focusRows = [], isLoading: loadingFocus } =
+    useDeveloperFocusStats(repoId, period);
+  const { data: riskCommits = [], isLoading: loadingRisk } =
+    useReviewRiskCommits(repoId, period);
+  const { data: activitySignals = [], isLoading: loadingSignals } =
+    useActivitySignalStats(repoId, period);
+  const { data: volatilityRows = [], isLoading: loadingVolatility } =
+    useFileVolatilityStats(repoId, period);
+  const { data: couplingRows = [], isLoading: loadingCoupling } =
+    useFileCouplingGraph(repoId, period);
 
   const loading = loadingFiles || loadingDirectories;
+  const loadingAdvanced =
+    loadingFocus ||
+    loadingRisk ||
+    loadingSignals ||
+    loadingVolatility ||
+    loadingCoupling;
   const hotspotFiles = files.filter((file) => file.hotspot_score >= 70).length;
   const siloFiles = files.filter((file) => file.silo_risk).length;
   const averageDirectoryHealth =
@@ -60,6 +87,9 @@ export default function CodeHealth() {
       ? directories.reduce((sum, row) => sum + row.directory_health_score, 0) /
         directories.length
       : 0;
+  const topRiskScore = riskCommits[0]?.risk_score ?? 0;
+  const topVolatilityScore = volatilityRows[0]?.volatility_score ?? 0;
+  const topActivitySignal = activitySignals[0]?.dominant_signal ?? "-";
 
   const updatePeriodType = (periodType: PeriodType) => {
     setPeriod({ periodType, periodKey: defaultKeyForType(periodType) });
@@ -115,14 +145,18 @@ export default function CodeHealth() {
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="Files" value={files.length} accent />
-        <StatCard label="Hotspots" value={hotspotFiles} />
-        <StatCard label="Silo Risk" value={siloFiles} />
-        <StatCard
-          label="Directory Risk"
-          value={formatScore(averageDirectoryHealth)}
-        />
-      </div>
+          <StatCard label="Files" value={files.length} accent />
+          <StatCard label="Hotspots" value={hotspotFiles} />
+          <StatCard label="Silo Risk" value={siloFiles} />
+          <StatCard
+            label="Directory Risk"
+            value={formatScore(averageDirectoryHealth)}
+          />
+          <StatCard label="Review Risk" value={formatScore(topRiskScore)} />
+          <StatCard label="Volatility" value={formatScore(topVolatilityScore)} />
+          <StatCard label="Couplings" value={couplingRows.length} />
+          <StatCard label="Signal" value={topActivitySignal} />
+        </div>
 
       <section>
         <h2
@@ -248,6 +282,282 @@ export default function CodeHealth() {
           </div>
         )}
       </section>
+
+      <section>
+        <h2
+          className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
+          style={{ fontFamily: "Inter, sans-serif" }}
+        >
+          Developer Focus
+        </h2>
+        {loadingFocus ? (
+          <p className="text-on-surface-variant text-sm">Loading...</p>
+        ) : focusRows.length === 0 ? (
+          <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
+            No focus data for this period. Sync the repository first.
+          </div>
+        ) : (
+          <div className="rounded-lg overflow-hidden bg-surface-container-low">
+            <div
+              className="grid px-4 py-2 text-xs uppercase tracking-widest text-on-surface-variant"
+              style={{ gridTemplateColumns: "1fr 90px 90px 96px 96px 120px" }}
+            >
+              <span>Developer</span>
+              <span className="text-right">Focus</span>
+              <span className="text-right">Switch</span>
+              <span className="text-right">Files</span>
+              <span className="text-right">Dirs</span>
+              <span className="text-right">Profile</span>
+            </div>
+            {focusRows.slice(0, 20).map((developer, index) => (
+              <div
+                key={developer.developer_id}
+                className={[
+                  "grid items-center px-4 py-3 transition-colors",
+                  index % 2 === 0 ? "bg-surface-container-low" : "bg-surface-container",
+                  "hover:bg-surface-container-highest",
+                ].join(" ")}
+                style={{ gridTemplateColumns: "1fr 90px 90px 96px 96px 120px" }}
+              >
+                <div className="min-w-0">
+                  <span className="block truncate font-semibold text-on-surface">
+                    {developer.developer_name}
+                  </span>
+                  <span className="block text-xs text-on-surface-variant">
+                    {developer.commits} commits / {developer.active_days} days
+                  </span>
+                </div>
+                <span className="text-right font-semibold text-primary">
+                  {formatScore(developer.focus_score)}
+                </span>
+                <span className="text-right text-on-surface-variant">
+                  {formatScore(developer.context_switching_index)}
+                </span>
+                <span className="text-right text-on-surface-variant">
+                  {developer.files_touched}
+                </span>
+                <span className="text-right text-on-surface-variant">
+                  {developer.directories_touched}
+                </span>
+                <span className="text-right text-on-surface-variant">
+                  {developer.profile_label}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div>
+          <h2
+            className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            Review Risk Proxy
+          </h2>
+          {loadingRisk ? (
+            <p className="text-on-surface-variant text-sm">Loading...</p>
+          ) : riskCommits.length === 0 ? (
+            <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
+              No risky commits for this period.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {riskCommits.slice(0, 8).map((commit) => (
+                <article
+                  key={commit.commit_id}
+                  className="rounded-lg bg-surface-container-low p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-on-surface">
+                        {commit.message || commit.sha.slice(0, 8)}
+                      </p>
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        {commit.developer_name} / {commit.files_changed} files /{" "}
+                        {commit.directories_touched} dirs
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-lg font-semibold text-primary">
+                      {formatScore(commit.risk_score)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-on-surface-variant">
+                    +{formatMetric(commit.insertions)} / -
+                    {formatMetric(commit.deletions)} / co-touch{" "}
+                    {formatScore(commit.max_file_co_touch_score)}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2
+            className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            Activity Signals
+          </h2>
+          {loadingSignals ? (
+            <p className="text-on-surface-variant text-sm">Loading...</p>
+          ) : activitySignals.length === 0 ? (
+            <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
+              No activity signal for this period.
+            </div>
+          ) : (
+            <div className="rounded-lg overflow-hidden bg-surface-container-low">
+              <div
+                className="grid px-4 py-2 text-xs uppercase tracking-widest text-on-surface-variant"
+                style={{ gridTemplateColumns: "1fr 88px 88px 88px 110px" }}
+              >
+                <span>Bucket</span>
+                <span className="text-right">Feature</span>
+                <span className="text-right">Refactor</span>
+                <span className="text-right">Cleanup</span>
+                <span className="text-right">Signal</span>
+              </div>
+              {activitySignals.slice(0, 12).map((signal, index) => (
+                <div
+                  key={signal.period_bucket}
+                  className={[
+                    "grid items-center px-4 py-3 transition-colors",
+                    index % 2 === 0 ? "bg-surface-container-low" : "bg-surface-container",
+                    "hover:bg-surface-container-highest",
+                  ].join(" ")}
+                  style={{ gridTemplateColumns: "1fr 88px 88px 88px 110px" }}
+                >
+                  <span className="min-w-0 truncate font-mono text-sm text-on-surface">
+                    {signal.period_bucket}
+                  </span>
+                  <span className="text-right text-on-surface-variant">
+                    {formatScore(signal.feature_score)}
+                  </span>
+                  <span className="text-right text-on-surface-variant">
+                    {formatScore(signal.refactor_score)}
+                  </span>
+                  <span className="text-right text-on-surface-variant">
+                    {formatScore(signal.cleanup_score)}
+                  </span>
+                  <span className="text-right font-semibold text-primary">
+                    {signal.dominant_signal}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div>
+          <h2
+            className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            Code Volatility
+          </h2>
+          {loadingVolatility ? (
+            <p className="text-on-surface-variant text-sm">Loading...</p>
+          ) : volatilityRows.length === 0 ? (
+            <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
+              No volatile files for this period.
+            </div>
+          ) : (
+            <div className="rounded-lg overflow-hidden bg-surface-container-low">
+              <div
+                className="grid px-4 py-2 text-xs uppercase tracking-widest text-on-surface-variant"
+                style={{ gridTemplateColumns: "1fr 86px 86px 90px" }}
+              >
+                <span>File</span>
+                <span className="text-right">Volatility</span>
+                <span className="text-right">Weeks</span>
+                <span className="text-right">Churn</span>
+              </div>
+              {volatilityRows.slice(0, 12).map((file, index) => (
+                <div
+                  key={file.file_id}
+                  className={[
+                    "grid items-center px-4 py-3 transition-colors",
+                    index % 2 === 0 ? "bg-surface-container-low" : "bg-surface-container",
+                    "hover:bg-surface-container-highest",
+                  ].join(" ")}
+                  style={{ gridTemplateColumns: "1fr 86px 86px 90px" }}
+                >
+                  <div className="min-w-0">
+                    <span className="block truncate font-mono text-sm text-on-surface">
+                      {file.file_path}
+                    </span>
+                    <span className="block text-xs text-on-surface-variant">
+                      {file.commits} commits / {file.unique_authors} authors
+                    </span>
+                  </div>
+                  <span className="text-right font-semibold text-primary">
+                    {formatScore(file.volatility_score)}
+                  </span>
+                  <span className="text-right text-on-surface-variant">
+                    {file.active_weeks}
+                  </span>
+                  <span className="text-right text-on-surface-variant">
+                    {formatMetric(file.churn)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2
+            className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            Coupling Graph
+          </h2>
+          {loadingCoupling ? (
+            <p className="text-on-surface-variant text-sm">Loading...</p>
+          ) : couplingRows.length === 0 ? (
+            <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
+              No coupled file pairs for this period.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {couplingRows.slice(0, 10).map((pair) => (
+                <article
+                  key={`${pair.source_file_id}-${pair.target_file_id}`}
+                  className="rounded-lg bg-surface-container-low p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <p className="truncate font-mono text-sm text-on-surface">
+                        {pair.source_file_path}
+                      </p>
+                      <p className="truncate font-mono text-sm text-on-surface-variant">
+                        {pair.target_file_path}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-lg font-semibold text-primary">
+                      {formatScore(pair.coupling_score)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-on-surface-variant">
+                    {pair.co_touch_count} shared commits
+                    {pair.last_touched_at ? ` / ${pair.last_touched_at}` : ""}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {loadingAdvanced && (
+        <p className="text-xs text-on-surface-variant">
+          Advanced metrics are still loading.
+        </p>
+      )}
     </div>
   );
 }
