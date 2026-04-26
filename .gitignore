@@ -8,7 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.superpowers/
 dist
+site-dist
 dist-ssr
 coverage
 .gitpulse-worktree/
