@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { AnalysisScopeMode, ScanProgress } from "../types";
+import type { AnalysisScope, AnalysisScopeMode, ScanProgress } from "../types";
 
 interface Notification {
   id: string;
@@ -14,6 +14,7 @@ interface AppContextValue {
   setRepoId: (id: string | null) => void;
   analysisScopeMode: AnalysisScopeMode;
   setAnalysisScopeMode: (mode: AnalysisScopeMode) => void;
+  analysisScope: AnalysisScope;
   scanningRepoId: string | null;
   setScanningRepoId: (id: string | null) => void;
   syncStatus: string;
@@ -46,6 +47,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateRepoId = (id: string | null) => {
     setRepoId(id);
     setAnalysisScopeModeState("repo");
+  };
+
+  const analysisScope: AnalysisScope = {
+    mode: analysisScopeMode,
+    repoId: analysisScopeMode === "repo" ? repoId : null,
+    workspaceId: analysisScopeMode === "workspace" ? workspaceId : null,
   };
 
   const setScanProgress = (progress: ScanProgress) => {
@@ -87,6 +94,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setRepoId: updateRepoId,
         analysisScopeMode,
         setAnalysisScopeMode: setAnalysisScopeModeState,
+        analysisScope,
         scanningRepoId,
         setScanningRepoId,
         syncStatus,

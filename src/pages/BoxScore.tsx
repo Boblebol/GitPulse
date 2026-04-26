@@ -17,12 +17,12 @@ function monthRange(): [string, string] {
 }
 
 export default function BoxScore() {
-  const { repoId } = useAppContext();
+  const { repoId, analysisScope } = useAppContext();
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
   const [fromDate, toDate] = monthRange();
 
-  const { data: devStats = [] } = useDeveloperGlobalStats();
+  const { data: devStats = [] } = useDeveloperGlobalStats(analysisScope);
   const { data: leaderboard = [], isLoading: loadingBoard } = useLeaderboard(repoId, fromDate, toDate);
   const { data: card } = useBoxScore(selectedDevId, repoId, selectedDate);
   const { data: dailyData = [] } = useDailyStats(selectedDevId, repoId, fromDate, toDate);

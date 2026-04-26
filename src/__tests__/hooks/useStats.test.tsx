@@ -56,6 +56,46 @@ describe("useStats hooks", () => {
       expect(invoke).toHaveBeenCalledWith("get_developer_global_stats");
     });
 
+    it("fetches developer stats scoped to a repository", async () => {
+      const mockStats = [{ developer_id: "dev1", commits: 10 }];
+      (invoke as jest.Mock).mockResolvedValue(mockStats);
+
+      const { result } = renderHook(
+        () => useDeveloperGlobalStats({ repoId: "repo1", workspaceId: null }),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual(mockStats);
+      expect(invoke).toHaveBeenCalledWith("get_developer_global_stats", {
+        repoId: "repo1",
+        workspaceId: null,
+      });
+    });
+
+    it("fetches developer stats scoped to a workspace", async () => {
+      const mockStats = [{ developer_id: "dev1", commits: 20 }];
+      (invoke as jest.Mock).mockResolvedValue(mockStats);
+
+      const { result } = renderHook(
+        () => useDeveloperGlobalStats({ repoId: null, workspaceId: "ws1" }),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual(mockStats);
+      expect(invoke).toHaveBeenCalledWith("get_developer_global_stats", {
+        repoId: null,
+        workspaceId: "ws1",
+      });
+    });
+
     it("handles fetch error", async () => {
       (invoke as jest.Mock).mockRejectedValue(new Error("Fetch failed"));
 

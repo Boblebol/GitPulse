@@ -13,12 +13,15 @@ function fmt(n: number): string {
 export default function Dashboard() {
   const {
     repoId,
+    workspaceId,
+    analysisScopeMode,
+    analysisScope,
     scanProgressByRepo,
     scanningRepoId,
     setScanningRepoId,
     setSyncStatus,
   } = useAppContext();
-  const { data: devStats = [], isLoading } = useDeveloperGlobalStats();
+  const { data: devStats = [], isLoading } = useDeveloperGlobalStats(analysisScope);
   const scan = useTriggerScan();
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();
@@ -76,6 +79,9 @@ export default function Dashboard() {
 
     resumeScan.mutate(repoId);
   };
+
+  const hasAnalysisTarget =
+    analysisScopeMode === "workspace" ? workspaceId != null : repoId != null;
 
   const totals = devStats.reduce(
     (acc, d) => ({
@@ -204,13 +210,13 @@ export default function Dashboard() {
       )}
 
       {/* No repo selected */}
-      {!repoId && (
+      {!hasAnalysisTarget && (
         <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
           Select a workspace and repository in the sidebar to get started.
         </div>
       )}
 
-      {repoId && (
+      {hasAnalysisTarget && (
         <>
           {/* Summary stats */}
           <section>

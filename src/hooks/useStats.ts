@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AnalysisScope,
   DeveloperGlobalRow,
   FileGlobalRow,
   LeaderboardEntry,
@@ -8,12 +9,22 @@ import type {
   StatsDirectoryGlobal,
 } from "../types";
 
+type DeveloperStatsScope = Pick<AnalysisScope, "repoId" | "workspaceId">;
+
 // ── Global stats ──────────────────────────────────────────────────────────────
 
-export function useDeveloperGlobalStats() {
+export function useDeveloperGlobalStats(scope?: DeveloperStatsScope | null) {
+  const hasScope = scope !== undefined && scope !== null;
+  const repoId = scope?.repoId ?? null;
+  const workspaceId = scope?.workspaceId ?? null;
+
   return useQuery<DeveloperGlobalRow[]>({
-    queryKey: ["stats", "developer_global"],
-    queryFn: () => invoke("get_developer_global_stats"),
+    queryKey: ["stats", "developer_global", repoId, workspaceId],
+    queryFn: () =>
+      hasScope
+        ? invoke("get_developer_global_stats", { repoId, workspaceId })
+        : invoke("get_developer_global_stats"),
+    enabled: !hasScope || repoId != null || workspaceId != null,
   });
 }
 

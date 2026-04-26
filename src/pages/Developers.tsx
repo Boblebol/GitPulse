@@ -57,7 +57,8 @@ function DevActivityPanel({ devId }: { devId: string }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function Developers() {
-  const { data: devStats = [], isLoading } = useDeveloperGlobalStats();
+  const { analysisScope } = useAppContext();
+  const { data: devStats = [], isLoading } = useDeveloperGlobalStats(analysisScope);
   const rename = useRenameDeveloper();
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");

@@ -42,8 +42,8 @@ export type AnalysisScopeMode = "repo" | "workspace";
 
 export interface AnalysisScope {
   mode: AnalysisScopeMode;
-  repo_id: string | null;
-  workspace_id: string | null;
+  repoId: string | null;
+  workspaceId: string | null;
 }
 
 // ── Developers & Aliases ──────────────────────────────────────────────────────
