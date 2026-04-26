@@ -88,6 +88,8 @@ pub fn run() {
             commands::history::get_hall_of_fame,
             // insights
             commands::insights::get_insights,
+            // recaps
+            commands::recaps::get_weekly_recap,
             // code health
             commands::health::get_file_health_stats,
             commands::health::get_directory_health_stats,
