@@ -12,6 +12,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "site:dev": "vite --config vite.site.config.ts",
+    "site:build": "tsc -p tsconfig.site.json && vite build --config vite.site.config.ts",
+    "site:preview": "vite preview --config vite.site.config.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "jest",

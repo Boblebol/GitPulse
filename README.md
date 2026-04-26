@@ -1,8 +1,14 @@
 # GitPulse
 
+[![CI](https://github.com/Boblebol/GitPulse/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Boblebol/GitPulse/actions/workflows/ci.yml)
+[![GitHub Pages](https://github.com/Boblebol/GitPulse/actions/workflows/pages.yml/badge.svg?branch=master)](https://github.com/Boblebol/GitPulse/actions/workflows/pages.yml)
+
 GitPulse is a local Tauri 2 desktop app for analyzing Git repository activity.
 It indexes local repositories into SQLite, aggregates developer/file/directory
 stats, and presents an NBA box-score style view of work patterns.
+
+Public documentation and tutorials are published with GitHub Pages:
+https://Boblebol.github.io/GitPulse/
 
 ## Stack
 
@@ -48,6 +54,14 @@ Frontend production build:
 pnpm build
 ```
 
+GitHub Pages documentation site:
+
+```bash
+pnpm run site:dev
+pnpm run site:build
+pnpm run site:preview
+```
+
 Backend tests:
 
 ```bash
@@ -75,6 +89,14 @@ Optional benchmark sizing:
 GITPULSE_BENCH_COMMITS=5000 GITPULSE_BENCH_FILES_PER_COMMIT=3 \
   cargo test large_repo_benchmark -- --ignored --nocapture
 ```
+
+## Releases
+
+Releases are prepared from the `master` branch and published by pushing tags
+named `vX.Y.Z`. The release workflow builds Linux, macOS, and Windows desktop
+artifacts, then attaches them to a draft GitHub Release.
+
+See [docs/release.md](docs/release.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Current Architecture
 
