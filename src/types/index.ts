@@ -46,6 +46,25 @@ export interface AnalysisScope {
   workspaceId: string | null;
 }
 
+// ── Time Ranges ──────────────────────────────────────────────────────────────
+
+export type TimeRangeMode =
+  | "all"
+  | "last_7"
+  | "last_14"
+  | "last_30"
+  | "last_90"
+  | "week"
+  | "month"
+  | "custom";
+
+export interface TimeRange {
+  mode: TimeRangeMode;
+  anchorDate: string;
+  fromDate: string | null;
+  toDate: string | null;
+}
+
 // ── Developers & Aliases ──────────────────────────────────────────────────────
 
 export interface Developer {

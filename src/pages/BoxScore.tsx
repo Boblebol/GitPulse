@@ -4,23 +4,18 @@ import { useLeaderboard, useBoxScore, useDailyStats } from "../hooks/useStats";
 import { useDeveloperGlobalStats } from "../hooks/useStats";
 import { Trophy, Flame, TrendingUp, TrendingDown } from "lucide-react";
 import ActivityChart from "../components/ActivityChart";
+import TimeRangePicker from "../components/TimeRangePicker";
+import { timeRangeToQuery } from "../utils/timeRange";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function monthRange(): [string, string] {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const to = now.toISOString().slice(0, 10);
-  return [from, to];
-}
-
 export default function BoxScore() {
-  const { repoId, analysisScope } = useAppContext();
+  const { repoId, analysisScope, timeRange, setTimeRange } = useAppContext();
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
-  const [fromDate, toDate] = monthRange();
+  const { fromDate, toDate } = timeRangeToQuery(timeRange);
 
   const { data: devStats = [] } = useDeveloperGlobalStats(analysisScope);
   const { data: leaderboard = [], isLoading: loadingBoard } = useLeaderboard(repoId, fromDate, toDate);
@@ -42,7 +37,7 @@ export default function BoxScore() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1
             className="text-3xl font-bold text-on-surface"
@@ -54,7 +49,8 @@ export default function BoxScore() {
             Daily performance cards & monthly leaderboard.
           </p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center justify-end">
+          <TimeRangePicker value={timeRange} onChange={setTimeRange} />
           <input
             type="date"
             value={selectedDate}

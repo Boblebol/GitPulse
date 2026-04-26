@@ -2,6 +2,7 @@ import { useAppContext } from "../context/AppContext";
 import { useDeveloperGlobalStats } from "../hooks/useStats";
 import { usePauseScan, useResumeScan, useScanStatus, useTriggerScan } from "../hooks/useRepos";
 import StatCard from "../components/StatCard";
+import TimeRangePicker from "../components/TimeRangePicker";
 import { RefreshCw, Flame, GitCommit, Clock, AlertCircle, CheckCircle2, Pause, Play } from "lucide-react";
 
 function fmt(n: number): string {
@@ -16,6 +17,8 @@ export default function Dashboard() {
     workspaceId,
     analysisScopeMode,
     analysisScope,
+    timeRange,
+    setTimeRange,
     scanProgressByRepo,
     scanningRepoId,
     setScanningRepoId,
@@ -110,7 +113,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1
             className="text-3xl font-bold text-on-surface"
@@ -122,16 +125,19 @@ export default function Dashboard() {
             Repository overview at a glance.
           </p>
         </div>
-        {repoId && (
-          <button
-            onClick={handleSyncRepo}
-            disabled={syncDisabled}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-50 transition-opacity"
-          >
-            <RefreshCw size={15} className={isSelectedRepoScanning ? "animate-spin" : ""} />
-            {isSelectedRepoScanning ? "Scanning…" : "Sync Repo"}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <TimeRangePicker value={timeRange} onChange={setTimeRange} />
+          {repoId && (
+            <button
+              onClick={handleSyncRepo}
+              disabled={syncDisabled}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-50 transition-opacity"
+            >
+              <RefreshCw size={15} className={isSelectedRepoScanning ? "animate-spin" : ""} />
+              {isSelectedRepoScanning ? "Scanning…" : "Sync Repo"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Scan progress */}

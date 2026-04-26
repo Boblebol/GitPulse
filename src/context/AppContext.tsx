@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { AnalysisScope, AnalysisScopeMode, ScanProgress } from "../types";
+import type { AnalysisScope, AnalysisScopeMode, ScanProgress, TimeRange } from "../types";
+import { createTimeRange } from "../utils/timeRange";
 
 interface Notification {
   id: string;
@@ -15,6 +16,8 @@ interface AppContextValue {
   analysisScopeMode: AnalysisScopeMode;
   setAnalysisScopeMode: (mode: AnalysisScopeMode) => void;
   analysisScope: AnalysisScope;
+  timeRange: TimeRange;
+  setTimeRange: (range: TimeRange) => void;
   scanningRepoId: string | null;
   setScanningRepoId: (id: string | null) => void;
   syncStatus: string;
@@ -34,6 +37,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [repoId, setRepoId] = useState<string | null>(null);
   const [analysisScopeMode, setAnalysisScopeModeState] =
     useState<AnalysisScopeMode>("repo");
+  const [timeRange, setTimeRange] = useState<TimeRange>(() => createTimeRange("all"));
   const [scanningRepoId, setScanningRepoId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [scanProgressByRepo, setScanProgressByRepo] = useState<Record<string, ScanProgress>>({});
@@ -95,6 +99,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         analysisScopeMode,
         setAnalysisScopeMode: setAnalysisScopeModeState,
         analysisScope,
+        timeRange,
+        setTimeRange,
         scanningRepoId,
         setScanningRepoId,
         syncStatus,

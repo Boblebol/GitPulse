@@ -245,6 +245,48 @@ describe("AppContext", () => {
     });
   });
 
+  it("stores the selected time range", async () => {
+    const user = userEvent.setup();
+
+    function TimeRangeComponent() {
+      const { timeRange, setTimeRange } = useAppContext();
+      return (
+        <div>
+          <div data-testid="time-range-mode">{timeRange.mode}</div>
+          <div data-testid="time-range-from">{timeRange.fromDate ?? "none"}</div>
+          <button
+            onClick={() =>
+              setTimeRange({
+                mode: "last_7",
+                anchorDate: "2026-04-26",
+                fromDate: "2026-04-20",
+                toDate: "2026-04-26",
+              })
+            }
+          >
+            Use Last 7
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AppProvider>
+        <TimeRangeComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("time-range-mode")).toHaveTextContent("all");
+    expect(screen.getByTestId("time-range-from")).toHaveTextContent("none");
+
+    await user.click(screen.getByRole("button", { name: "Use Last 7" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("time-range-mode")).toHaveTextContent("last_7");
+      expect(screen.getByTestId("time-range-from")).toHaveTextContent("2026-04-20");
+    });
+  });
+
   it("updates scanning and sync status", async () => {
     const user = userEvent.setup();
 

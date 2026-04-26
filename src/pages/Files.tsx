@@ -10,6 +10,7 @@ import {
 import { useAppContext } from "../context/AppContext";
 import { useFileStats, useDirectoryStats } from "../hooks/useStats";
 import StatCard from "../components/StatCard";
+import TimeRangePicker from "../components/TimeRangePicker";
 import { FileCode2 } from "lucide-react";
 
 const COLORS = ["#f26522", "#ffb599", "#ffb599", "#9ba5c0"];
@@ -43,7 +44,7 @@ function parentDirectoryLabel(path: string): string {
 }
 
 export default function Files() {
-  const { repoId } = useAppContext();
+  const { repoId, timeRange, setTimeRange } = useAppContext();
   const { data: files = [], isLoading: loadingFiles } = useFileStats(repoId);
   const { data: dirs = [], isLoading: loadingDirs }   = useDirectoryStats(repoId);
 
@@ -70,16 +71,19 @@ export default function Files() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1
-          className="text-3xl font-bold text-on-surface"
-          style={{ fontFamily: "Space Grotesk, sans-serif" }}
-        >
-          Files
-        </h1>
-        <p className="text-on-surface-variant text-sm mt-0.5">
-          Hotspots, churn scores and directory breakdown.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1
+            className="text-3xl font-bold text-on-surface"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          >
+            Files
+          </h1>
+          <p className="text-on-surface-variant text-sm mt-0.5">
+            Hotspots, churn scores and directory breakdown.
+          </p>
+        </div>
+        <TimeRangePicker value={timeRange} onChange={setTimeRange} />
       </div>
 
       {/* Summary */}

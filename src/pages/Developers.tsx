@@ -4,15 +4,15 @@ import { useRenameDeveloper } from "../hooks/useDevelopers";
 import { useAppContext } from "../context/AppContext";
 import StatCard from "../components/StatCard";
 import ActivityChart from "../components/ActivityChart";
+import TimeRangePicker from "../components/TimeRangePicker";
 import { Pencil, Check, X, ChevronDown } from "lucide-react";
+import { timeRangeToQuery } from "../utils/timeRange";
 
 // ── Per-developer 30-day activity panel ─────────────────────────────────────
 
 function DevActivityPanel({ devId }: { devId: string }) {
-  const { repoId } = useAppContext();
-
-  const toDate = new Date().toISOString().slice(0, 10);
-  const fromDate = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
+  const { repoId, timeRange } = useAppContext();
+  const { fromDate, toDate } = timeRangeToQuery(timeRange);
 
   const { data = [], isLoading } = useDailyStats(devId, repoId, fromDate, toDate);
 
@@ -57,7 +57,7 @@ function DevActivityPanel({ devId }: { devId: string }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function Developers() {
-  const { analysisScope } = useAppContext();
+  const { analysisScope, timeRange, setTimeRange } = useAppContext();
   const { data: devStats = [], isLoading } = useDeveloperGlobalStats(analysisScope);
   const rename = useRenameDeveloper();
   const [editing, setEditing] = useState<string | null>(null);
@@ -87,16 +87,19 @@ export default function Developers() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1
-          className="text-3xl font-bold text-on-surface"
-          style={{ fontFamily: "Space Grotesk, sans-serif" }}
-        >
-          Developers
-        </h1>
-        <p className="text-on-surface-variant text-sm mt-0.5">
-          All-time stats per developer across every repository.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1
+            className="text-3xl font-bold text-on-surface"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          >
+            Developers
+          </h1>
+          <p className="text-on-surface-variant text-sm mt-0.5">
+            Stats per developer for the selected scope.
+          </p>
+        </div>
+        <TimeRangePicker value={timeRange} onChange={setTimeRange} />
       </div>
 
       {/* Summary row */}
@@ -253,7 +256,7 @@ export default function Developers() {
                       className="text-xs uppercase tracking-widest text-on-surface-variant mb-3"
                       style={{ fontFamily: "Inter, sans-serif" }}
                     >
-                      Last 30 days
+                      Selected Range
                     </p>
                     <DevActivityPanel devId={d.developer_id} />
                   </div>
