@@ -13,6 +13,7 @@ import {
   useRemoveRepo,
   useSetRepoBranch,
   useListRepoBranches,
+  useRepoBranches,
   useScanProgressEvents,
 } from "../../hooks/useRepos";
 import type { ReactNode } from "react";
@@ -168,6 +169,27 @@ describe("useRepos hooks", () => {
       await waitFor(() => {
         expect(invoke).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+
+  describe("useRepoBranches", () => {
+    it("fetches branches for a repository path", async () => {
+      (invoke as jest.Mock).mockResolvedValue(["main", "release"]);
+
+      const { result } = renderHook(() => useRepoBranches("/repo/path"), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual(["main", "release"]);
+      expect(invoke).toHaveBeenCalledWith("list_repo_branches", { path: "/repo/path" });
+    });
+
+    it("does not fetch branches without a repository path", () => {
+      renderHook(() => useRepoBranches(null), { wrapper });
+
+      expect(invoke).not.toHaveBeenCalled();
     });
   });
 
@@ -385,6 +407,36 @@ describe("useRepos hooks", () => {
       expect(invoke).toHaveBeenCalledWith("set_repo_branch", {
         repoId: "repo1",
         branch: "develop",
+      });
+    });
+
+    it("invalidates repo, stats, and branch queries after branch changes", async () => {
+      (invoke as jest.Mock).mockResolvedValue({
+        id: "repo1",
+        name: "Project A",
+        path: "/path/to/repo",
+        active_branch: "develop",
+      });
+      const invalidateQuerySpy = jest.spyOn(queryClient, "invalidateQueries");
+
+      const { result } = renderHook(() => useSetRepoBranch(), { wrapper });
+
+      await act(async () => {
+        result.current.mutate({
+          repoId: "repo1",
+          branch: "develop",
+          workspaceId: "ws1",
+        });
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["repos", "ws1"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({ queryKey: ["stats"] });
+      expect(invalidateQuerySpy).toHaveBeenCalledWith({
+        queryKey: ["branches", "/path/to/repo"],
       });
     });
   });

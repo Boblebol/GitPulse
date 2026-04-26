@@ -10,17 +10,58 @@ import {
   useSetRepoBranch,
   usePauseScan,
   useResumeScan,
+  useRepoBranches,
 } from "../hooks/useRepos";
 import { useUpdateFormula } from "../hooks/useStats";
 import { useAppContext } from "../context/AppContext";
 import { Plus, Trash2, RefreshCw, FlaskConical, ChevronDown, Pause, Play } from "lucide-react";
-import type { ScanProgress } from "../types";
+import type { Repo, ScanProgress } from "../types";
 
 const DEFAULT_FORMULA =
   "(commits * 10) + (insertions * 0.5) - (deletions * 0.3) + (files_touched * 2) + (streak_bonus * 3)";
 
 function formatScanStatus(status: ScanProgress["status"]) {
   return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function RepoBranchPicker({
+  repo,
+  workspaceId,
+}: {
+  repo: Repo;
+  workspaceId: string;
+}) {
+  const { data: branches = [] } = useRepoBranches(repo.path);
+  const setRepoBranch = useSetRepoBranch();
+  const branchOptions = branches.includes(repo.active_branch)
+    ? branches
+    : [repo.active_branch, ...branches];
+
+  return (
+    <div className="relative w-auto max-w-[150px] shrink-0">
+      <select
+        value={repo.active_branch}
+        disabled={setRepoBranch.isPending}
+        onChange={(e) => {
+          if (e.target.value !== repo.active_branch) {
+            setRepoBranch.mutate({
+              repoId: repo.id,
+              branch: e.target.value,
+              workspaceId,
+            });
+          }
+        }}
+        className="w-full appearance-none bg-surface-container-high text-on-surface text-xs rounded px-2 py-1 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-6 truncate disabled:opacity-40"
+      >
+        {branchOptions.map((branch) => (
+          <option key={branch} value={branch}>
+            {branch}
+          </option>
+        ))}
+      </select>
+      <ChevronDown size={12} className="absolute right-1 top-1/2 transform -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+    </div>
+  );
 }
 
 export default function Settings() {
@@ -43,7 +84,6 @@ export default function Settings() {
 
   // For listing branches when adding a new repo
   const [branches, setBranches] = useState<string[]>([]);
-  const setRepoBranch = useSetRepoBranch();
 
   // Load branches when path changes
   useEffect(() => {
@@ -225,24 +265,7 @@ export default function Settings() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-on-surface font-medium truncate">{r.name}</span>
-                        <div className="relative w-auto max-w-[150px] shrink-0">
-                          <select
-                            value={r.active_branch}
-                            onChange={(e) => {
-                              if (e.target.value !== r.active_branch) {
-                                setRepoBranch.mutate({
-                                  repoId: r.id,
-                                  branch: e.target.value,
-                                  workspaceId,
-                                });
-                              }
-                            }}
-                            className="w-full appearance-none bg-surface-container-high text-on-surface text-xs rounded px-2 py-1 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-6 truncate"
-                          >
-                            <option value={r.active_branch}>{r.active_branch}</option>
-                          </select>
-                          <ChevronDown size={12} className="absolute right-1 top-1/2 transform -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                        </div>
+                        <RepoBranchPicker repo={r} workspaceId={workspaceId} />
                       </div>
                       <span className="text-xs text-on-surface-variant ml-2 font-mono block mt-1 truncate">{r.path}</span>
                       {(isRepoScanning || scanStatus === "failed") && (scanProgress || syncStatus) && (

@@ -111,6 +111,14 @@ export function useListRepoBranches() {
   });
 }
 
+export function useRepoBranches(path: string | null) {
+  return useQuery<string[]>({
+    queryKey: ["branches", path],
+    queryFn: () => invoke("list_repo_branches", { path }),
+    enabled: path != null && path.trim() !== "",
+  });
+}
+
 export function useAddRepo() {
   const qc = useQueryClient();
   return useMutation<
@@ -143,8 +151,11 @@ export function useSetRepoBranch() {
   >({
     mutationFn: ({ repoId, branch }) =>
       invoke("set_repo_branch", { repoId, branch }),
-    onSuccess: (_data, vars) =>
-      qc.invalidateQueries({ queryKey: ["repos", vars.workspaceId] }),
+    onSuccess: (repo, vars) => {
+      qc.invalidateQueries({ queryKey: ["repos", vars.workspaceId] });
+      qc.invalidateQueries({ queryKey: ["branches", repo.path] });
+      invalidateScanDependentQueries(qc, repo.id);
+    },
   });
 }
 
