@@ -80,6 +80,7 @@ pub fn run() {
             commands::stats::get_daily_stats,
             commands::stats::get_file_stats,
             commands::stats::get_directory_stats,
+            commands::stats::get_activity_timeline,
             // boxscore
             commands::boxscore::get_box_score,
             commands::boxscore::get_leaderboard,

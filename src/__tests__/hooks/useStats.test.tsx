@@ -8,6 +8,7 @@ import {
   useBoxScore,
   useLeaderboard,
   useUpdateFormula,
+  useActivityTimeline,
 } from "../../hooks/useStats";
 import type { ReactNode } from "react";
 
@@ -73,6 +74,8 @@ describe("useStats hooks", () => {
       expect(invoke).toHaveBeenCalledWith("get_developer_global_stats", {
         repoId: "repo1",
         workspaceId: null,
+        fromDate: null,
+        toDate: null,
       });
     });
 
@@ -93,6 +96,32 @@ describe("useStats hooks", () => {
       expect(invoke).toHaveBeenCalledWith("get_developer_global_stats", {
         repoId: null,
         workspaceId: "ws1",
+        fromDate: null,
+        toDate: null,
+      });
+    });
+
+    it("passes date range params for developer stats", async () => {
+      (invoke as jest.Mock).mockResolvedValue([]);
+
+      const { result } = renderHook(
+        () =>
+          useDeveloperGlobalStats(
+            { repoId: "repo1", workspaceId: null },
+            { fromDate: "2026-04-01", toDate: "2026-04-30" }
+          ),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(invoke).toHaveBeenCalledWith("get_developer_global_stats", {
+        repoId: "repo1",
+        workspaceId: null,
+        fromDate: "2026-04-01",
+        toDate: "2026-04-30",
       });
     });
 
@@ -135,7 +164,30 @@ describe("useStats hooks", () => {
       });
 
       expect(result.current.data).toEqual(mockStats);
-      expect(invoke).toHaveBeenCalledWith("get_file_stats", { repoId: "repo1" });
+      expect(invoke).toHaveBeenCalledWith("get_file_stats", {
+        repoId: "repo1",
+        fromDate: null,
+        toDate: null,
+      });
+    });
+
+    it("passes date range params for file stats", async () => {
+      (invoke as jest.Mock).mockResolvedValue([]);
+
+      const { result } = renderHook(
+        () => useFileStats("repo1", { fromDate: "2026-04-01", toDate: "2026-04-30" }),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(invoke).toHaveBeenCalledWith("get_file_stats", {
+        repoId: "repo1",
+        fromDate: "2026-04-01",
+        toDate: "2026-04-30",
+      });
     });
 
     it("does not fetch when repoId is null", () => {
@@ -172,7 +224,34 @@ describe("useStats hooks", () => {
       });
 
       expect(result.current.data).toEqual(mockStats);
-      expect(invoke).toHaveBeenCalledWith("get_directory_stats", { repoId: "repo1" });
+      expect(invoke).toHaveBeenCalledWith("get_directory_stats", {
+        repoId: "repo1",
+        fromDate: null,
+        toDate: null,
+      });
+    });
+
+    it("passes date range params for directory stats", async () => {
+      (invoke as jest.Mock).mockResolvedValue([]);
+
+      const { result } = renderHook(
+        () =>
+          useDirectoryStats("repo1", {
+            fromDate: "2026-04-01",
+            toDate: "2026-04-30",
+          }),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(invoke).toHaveBeenCalledWith("get_directory_stats", {
+        repoId: "repo1",
+        fromDate: "2026-04-01",
+        toDate: "2026-04-30",
+      });
     });
 
     it("does not fetch when repoId is null", () => {
@@ -398,6 +477,47 @@ describe("useStats hooks", () => {
       });
 
       expect(result.current.data).toEqual([]);
+    });
+  });
+
+  describe("useActivityTimeline", () => {
+    it("fetches activity timeline for a scoped date range", async () => {
+      const mockTimeline = [{ date: "2026-04-01", commits: 3 }];
+      (invoke as jest.Mock).mockResolvedValue(mockTimeline);
+
+      const { result } = renderHook(
+        () =>
+          useActivityTimeline(
+            { repoId: "repo1", workspaceId: null },
+            { fromDate: "2026-04-01", toDate: "2026-04-30" }
+          ),
+        { wrapper }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual(mockTimeline);
+      expect(invoke).toHaveBeenCalledWith("get_activity_timeline", {
+        repoId: "repo1",
+        workspaceId: null,
+        fromDate: "2026-04-01",
+        toDate: "2026-04-30",
+      });
+    });
+
+    it("does not fetch timeline without a repo or workspace scope", () => {
+      renderHook(
+        () =>
+          useActivityTimeline(
+            { repoId: null, workspaceId: null },
+            { fromDate: "2026-04-01", toDate: "2026-04-30" }
+          ),
+        { wrapper }
+      );
+
+      expect(invoke).not.toHaveBeenCalled();
     });
   });
 

@@ -16,8 +16,9 @@ export default function BoxScore() {
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
   const { fromDate, toDate } = timeRangeToQuery(timeRange);
+  const dateRange = { fromDate, toDate };
 
-  const { data: devStats = [] } = useDeveloperGlobalStats(analysisScope);
+  const { data: devStats = [] } = useDeveloperGlobalStats(analysisScope, dateRange);
   const { data: leaderboard = [], isLoading: loadingBoard } = useLeaderboard(repoId, fromDate, toDate);
   const { data: card } = useBoxScore(selectedDevId, repoId, selectedDate);
   const { data: dailyData = [] } = useDailyStats(selectedDevId, repoId, fromDate, toDate);

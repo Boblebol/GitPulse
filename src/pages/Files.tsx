@@ -12,6 +12,7 @@ import { useFileStats, useDirectoryStats } from "../hooks/useStats";
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
 import { FileCode2 } from "lucide-react";
+import { timeRangeToQuery } from "../utils/timeRange";
 
 const COLORS = ["#f26522", "#ffb599", "#ffb599", "#9ba5c0"];
 function barColor(i: number) {
@@ -45,8 +46,9 @@ function parentDirectoryLabel(path: string): string {
 
 export default function Files() {
   const { repoId, timeRange, setTimeRange } = useAppContext();
-  const { data: files = [], isLoading: loadingFiles } = useFileStats(repoId);
-  const { data: dirs = [], isLoading: loadingDirs }   = useDirectoryStats(repoId);
+  const dateRange = timeRangeToQuery(timeRange);
+  const { data: files = [], isLoading: loadingFiles } = useFileStats(repoId, dateRange);
+  const { data: dirs = [], isLoading: loadingDirs }   = useDirectoryStats(repoId, dateRange);
 
   if (!repoId) {
     return (

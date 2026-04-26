@@ -4,6 +4,7 @@ import { usePauseScan, useResumeScan, useScanStatus, useTriggerScan } from "../h
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
 import { RefreshCw, Flame, GitCommit, Clock, AlertCircle, CheckCircle2, Pause, Play } from "lucide-react";
+import { timeRangeToQuery } from "../utils/timeRange";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -24,7 +25,11 @@ export default function Dashboard() {
     setScanningRepoId,
     setSyncStatus,
   } = useAppContext();
-  const { data: devStats = [], isLoading } = useDeveloperGlobalStats(analysisScope);
+  const dateRange = timeRangeToQuery(timeRange);
+  const { data: devStats = [], isLoading } = useDeveloperGlobalStats(
+    analysisScope,
+    dateRange,
+  );
   const scan = useTriggerScan();
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();

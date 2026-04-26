@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  ActivityTimelineRow,
   AnalysisScope,
   DeveloperGlobalRow,
   FileGlobalRow,
@@ -10,37 +11,79 @@ import type {
 } from "../types";
 
 type DeveloperStatsScope = Pick<AnalysisScope, "repoId" | "workspaceId">;
+type DateRangeParams = {
+  fromDate: string | null;
+  toDate: string | null;
+};
 
 // ── Global stats ──────────────────────────────────────────────────────────────
 
-export function useDeveloperGlobalStats(scope?: DeveloperStatsScope | null) {
+export function useDeveloperGlobalStats(
+  scope?: DeveloperStatsScope | null,
+  dateRange?: DateRangeParams | null,
+) {
   const hasScope = scope !== undefined && scope !== null;
   const repoId = scope?.repoId ?? null;
   const workspaceId = scope?.workspaceId ?? null;
+  const fromDate = dateRange?.fromDate ?? null;
+  const toDate = dateRange?.toDate ?? null;
 
   return useQuery<DeveloperGlobalRow[]>({
-    queryKey: ["stats", "developer_global", repoId, workspaceId],
+    queryKey: ["stats", "developer_global", repoId, workspaceId, fromDate, toDate],
     queryFn: () =>
       hasScope
-        ? invoke("get_developer_global_stats", { repoId, workspaceId })
+        ? invoke("get_developer_global_stats", {
+            repoId,
+            workspaceId,
+            fromDate,
+            toDate,
+          })
         : invoke("get_developer_global_stats"),
     enabled: !hasScope || repoId != null || workspaceId != null,
   });
 }
 
-export function useFileStats(repoId: string | null) {
+export function useFileStats(repoId: string | null, dateRange?: DateRangeParams | null) {
+  const fromDate = dateRange?.fromDate ?? null;
+  const toDate = dateRange?.toDate ?? null;
+
   return useQuery<FileGlobalRow[]>({
-    queryKey: ["file_stats", repoId],
-    queryFn: () => invoke("get_file_stats", { repoId }),
+    queryKey: ["file_stats", repoId, fromDate, toDate],
+    queryFn: () => invoke("get_file_stats", { repoId, fromDate, toDate }),
     enabled: repoId != null,
   });
 }
 
-export function useDirectoryStats(repoId: string | null) {
+export function useDirectoryStats(repoId: string | null, dateRange?: DateRangeParams | null) {
+  const fromDate = dateRange?.fromDate ?? null;
+  const toDate = dateRange?.toDate ?? null;
+
   return useQuery<StatsDirectoryGlobal[]>({
-    queryKey: ["directory_stats", repoId],
-    queryFn: () => invoke("get_directory_stats", { repoId }),
+    queryKey: ["directory_stats", repoId, fromDate, toDate],
+    queryFn: () => invoke("get_directory_stats", { repoId, fromDate, toDate }),
     enabled: repoId != null,
+  });
+}
+
+export function useActivityTimeline(
+  scope: DeveloperStatsScope,
+  dateRange: DateRangeParams,
+) {
+  const repoId = scope.repoId ?? null;
+  const workspaceId = scope.workspaceId ?? null;
+  const fromDate = dateRange.fromDate ?? null;
+  const toDate = dateRange.toDate ?? null;
+
+  return useQuery<ActivityTimelineRow[]>({
+    queryKey: ["activity_timeline", repoId, workspaceId, fromDate, toDate],
+    queryFn: () =>
+      invoke("get_activity_timeline", {
+        repoId,
+        workspaceId,
+        fromDate,
+        toDate,
+      }),
+    enabled: repoId != null || workspaceId != null,
   });
 }
 

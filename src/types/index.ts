@@ -143,6 +143,14 @@ export interface StatsDirectoryGlobal {
   churn_score: number;
 }
 
+export interface ActivityTimelineRow {
+  date: string;
+  commits: number;
+  insertions: number;
+  deletions: number;
+  files_touched: number;
+}
+
 // ── Box Score ─────────────────────────────────────────────────────────────────
 
 export interface LeaderboardEntry {
