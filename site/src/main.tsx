@@ -47,6 +47,11 @@ const features = [
     text: "Read top developers, top files, activity timelines, commits, churn, files touched, and streaks.",
   },
   {
+    icon: <FileText size={22} />,
+    title: "Weekly recaps",
+    text: "Regenerate a weekly repo or workspace summary and copy deterministic Markdown for reviews or OSS updates.",
+  },
+  {
     icon: <Boxes size={22} />,
     title: "Box scores",
     text: "Turn daily activity into player-style scorecards with an editable formula stored in SQLite.",
@@ -58,6 +63,7 @@ const docs = [
   ["PRD", "Product requirements and core feature scope.", `${repoUrl}/blob/master/prd_md.md`],
   ["Architecture", "Repository architecture notes and implementation context.", `${repoUrl}/blob/master/architecture_md.md`],
   ["V2 plan", "Completed plan for scoped stats, time filters, dashboard, branches, and aliases.", `${repoUrl}/blob/master/docs/development-plan-v2.md`],
+  ["Retention roadmap", "Versioned plan for tours, demo mode, insights, recaps, and return workflows.", `${repoUrl}/blob/master/docs/superpowers/plans/2026-04-26-retention-product-roadmap.md`],
   ["Release process", "How maintainers prepare tags and publish desktop builds.", `${repoUrl}/blob/master/docs/release.md`],
   ["Changelog", "Human-readable release history.", `${repoUrl}/blob/master/CHANGELOG.md`],
 ];
@@ -78,6 +84,10 @@ const tutorials = [
   {
     title: "Use time filters",
     steps: ["Select a preset range or custom dates.", "Use week or month navigation for reviews.", "Read top files and timelines for that range."],
+  },
+  {
+    title: "Prepare a weekly recap",
+    steps: ["Select a repo or switch to workspace scope.", "Open Weekly Recap.", "Pick the week to regenerate.", "Copy the Markdown into a review note or release update."],
   },
   {
     title: "Switch branches",

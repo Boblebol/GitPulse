@@ -19,7 +19,7 @@
 | `v4.0.0` | `V4-001` | Activation Tour | Shipped in `645fabd` | First-run product tour, persisted dismissal, sidebar reopen entry point. |
 | `v4.1.0` | `V4-002` | Demo Aha Moment | Shipped in `75b9971` | Demo mode, sample Dashboard data, improved no-repo activation state. |
 | `v4.2.0` | `V4-003` | Insights Inbox | Shipped in `69b0262` + `991b4d3` | Local insight feed with severity/category labels and Dashboard preview. |
-| `v4.3.0` | `V4-004` | Weekly Recap | Planned | Weekly repo/workspace recap with copyable Markdown. |
+| `v4.3.0` | `V4-004` | Weekly Recap | Shipped in `c433f7d` + `40cba73` | Weekly repo/workspace recap with copyable Markdown. |
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Planned | Watch files/directories/repos and compare periods. |
 | `v4.5.0` | `V4-006` | Shareable Reports | Planned | Markdown exports for Dashboard, Code Health, and recaps. |
 | `v4.6.0` | `V4-007` | Achievements Polish | Planned | Positive code-health achievements and HOF refinements. |
@@ -122,7 +122,7 @@ Release rule: each version must be independently useful, tested, and documented 
 
 **Publishable version:** `v4.3.0`
 
-**Status:** Planned.
+**Status:** Shipped in `c433f7d feat(recaps): add weekly recap command` and `40cba73 feat(ui): add weekly recap page`.
 
 **Outcome:** GitPulse becomes a recurring review ritual.
 
@@ -139,6 +139,21 @@ Release rule: each version must be independently useful, tested, and documented 
 - Tests cover date bounds and Markdown output.
 
 **Commit:** `feat(recaps): add weekly recap`
+
+**V4-004 Ticket Breakdown:**
+
+- `V4-004A`: Backend `get_weekly_recap(repo_id?, workspace_id?, week_start)` command.
+- `V4-004B`: Frontend `useWeeklyRecap` hook and `WeeklyRecap` type.
+- `V4-004C`: `Weekly Recap` page with week navigation and copyable Markdown.
+- `V4-004D`: Sidebar and route entry point.
+- `V4-004E`: Release status update after verification.
+
+**V4-004 Initial Recap Sections:**
+
+- `activity`: commits, insertions, deletions, active days.
+- `standouts`: top developer and top file for the selected week.
+- `insight`: highest-priority local insight for the selected scope and week.
+- `markdown`: deterministic recap text for retros, standups, or OSS updates.
 
 ### Milestone 5: Watchlists And Compare Mode
 
