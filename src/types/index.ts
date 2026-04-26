@@ -198,6 +198,20 @@ export interface WeeklyRecap {
   markdown: string;
 }
 
+// ── Watchlists ───────────────────────────────────────────────────────────────
+
+export type WatchlistItemType = "repo" | "file" | "directory";
+
+export interface WatchlistItem {
+  id: string;
+  type: WatchlistItemType;
+  label: string;
+  target: string;
+  repoId: string | null;
+  workspaceId: string | null;
+  createdAt: string;
+}
+
 // ── Box Score ─────────────────────────────────────────────────────────────────
 
 export interface LeaderboardEntry {
