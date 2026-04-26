@@ -11,6 +11,7 @@ const Insights = lazy(() => import("./pages/Insights"));
 const WeeklyRecap = lazy(() => import("./pages/WeeklyRecap"));
 const Watchlists = lazy(() => import("./pages/Watchlists"));
 const Reports = lazy(() => import("./pages/Reports"));
+const Achievements = lazy(() => import("./pages/Achievements"));
 const Seasons = lazy(() => import("./pages/Seasons"));
 const Awards = lazy(() => import("./pages/Awards"));
 const Records = lazy(() => import("./pages/Records"));
@@ -44,6 +45,7 @@ const router = createHashRouter([
       { path: "weekly-recap", element: route(<WeeklyRecap />) },
       { path: "watchlists", element: route(<Watchlists />) },
       { path: "reports", element: route(<Reports />) },
+      { path: "achievements", element: route(<Achievements />) },
       { path: "seasons", element: route(<Seasons />) },
       { path: "awards", element: route(<Awards />) },
       { path: "records", element: route(<Records />) },

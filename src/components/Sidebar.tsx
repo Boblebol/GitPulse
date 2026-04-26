@@ -33,6 +33,7 @@ const NAV = [
   { to: "/weekly-recap", label: "Weekly Recap", Icon: CalendarDays    },
   { to: "/watchlists",  label: "Watchlists",   Icon: Bookmark        },
   { to: "/reports",     label: "Reports",      Icon: FileText        },
+  { to: "/achievements", label: "Achievements", Icon: Sparkles        },
   { to: "/seasons",     label: "Seasons",      Icon: CalendarDays    },
   { to: "/awards",      label: "Awards",       Icon: Award           },
   { to: "/records",     label: "Records",      Icon: History         },
