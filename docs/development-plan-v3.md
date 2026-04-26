@@ -15,7 +15,7 @@
 - [x] V3 plan documented: `50af40a docs: add v3 historical health plan`
 - [x] Backend historical analytics and code-health commands: `0b01150 feat(stats): add v3 historical and health commands`
 - [x] Frontend hooks and pages for Seasons, Awards, Records, and Code Health: `4249532 feat(ui): add v3 analytics views`
-- [ ] Later advanced metrics: context switching, focus score, review risk proxy, refactor/feature signal, code volatility, coupling graph.
+- [x] V3.1 advanced code-health metrics and Hall of Fame documented as implemented.
 
 ---
 
@@ -46,11 +46,8 @@ The first V3 release should ship:
 
 Later V3 extensions:
 
-- Context switching / focus score.
-- Review risk proxy.
-- Refactor vs feature signal.
-- Code volatility.
-- Coupling graph.
+- V3.1 advanced code-health metrics.
+- Hall of Fame.
 
 ---
 
@@ -358,11 +355,11 @@ directory_health_score =
 
 ---
 
-## Ticket V3-T10: Later Advanced Metrics
+## Ticket V3-T10: V3.1 Advanced Metrics And Hall Of Fame
 
-**Status:** Pending.
+**Status:** Done.
 
-**Purpose:** extend V3 after MVP.
+**Purpose:** extend V3 with deeper maintainability signals and a career-level Hall of Fame view.
 
 **Metrics:**
 
@@ -372,6 +369,21 @@ directory_health_score =
 - Refactor vs Feature Signal.
 - Code Volatility.
 - Coupling Graph.
+- Hall of Fame career categories.
+
+**Backend Commands:**
+
+- `get_developer_focus_stats(repo_id, period_type, period_key)`
+- `get_review_risk_commits(repo_id, period_type, period_key)`
+- `get_activity_signal_stats(repo_id, period_type, period_key)`
+- `get_file_volatility_stats(repo_id, period_type, period_key)`
+- `get_file_coupling_graph(repo_id, period_type, period_key)`
+- `get_hall_of_fame(repo_id?, workspace_id?)`
+
+**Frontend Exposure:**
+
+- Code Health includes focus/context switching, review risk, refactor signal, volatility, and coupling sections.
+- Historical stats exposes Hall of Fame data alongside seasons, awards, and records.
 
 **Recommended Commit Series:**
 
