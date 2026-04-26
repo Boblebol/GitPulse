@@ -12,7 +12,27 @@
 
 ## Milestones
 
+## Publishable Release Train
+
+| Version | Ticket | Release Name | Status | Publishable Scope |
+|---|---:|---|---|---|
+| `v4.0.0` | `V4-001` | Activation Tour | Shipped in `645fabd` | First-run product tour, persisted dismissal, sidebar reopen entry point. |
+| `v4.1.0` | `V4-002` | Demo Aha Moment | Next | Demo mode, sample Dashboard data, improved no-repo activation state. |
+| `v4.2.0` | `V4-003` | Insights Inbox | Planned | Local insight feed with severity/category labels and Dashboard preview. |
+| `v4.3.0` | `V4-004` | Weekly Recap | Planned | Weekly repo/workspace recap with copyable Markdown. |
+| `v4.4.0` | `V4-005` | Watchlists And Compare | Planned | Watch files/directories/repos and compare periods. |
+| `v4.5.0` | `V4-006` | Shareable Reports | Planned | Markdown exports for Dashboard, Code Health, and recaps. |
+| `v4.6.0` | `V4-007` | Achievements Polish | Planned | Positive code-health achievements and HOF refinements. |
+
+Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
+
 ### Milestone 1: Activation And Product Tour
+
+**Ticket:** `V4-001`
+
+**Publishable version:** `v4.0.0`
+
+**Status:** Shipped in `645fabd feat(onboarding): add product tour`.
 
 **Outcome:** new users understand the app quickly and know the shortest path to value.
 
@@ -34,6 +54,12 @@
 
 ### Milestone 2: Demo And Empty-State Aha Moments
 
+**Ticket:** `V4-002`
+
+**Publishable version:** `v4.1.0`
+
+**Status:** In progress.
+
 **Outcome:** users can experience GitPulse before connecting a real repository.
 
 **Scope:**
@@ -51,6 +77,12 @@
 **Commit:** `feat(onboarding): add demo mode`
 
 ### Milestone 3: Insights Inbox
+
+**Ticket:** `V4-003`
+
+**Publishable version:** `v4.2.0`
+
+**Status:** Planned.
 
 **Outcome:** users have a reason to return after scans.
 
@@ -70,6 +102,12 @@
 
 ### Milestone 4: Weekly Recap
 
+**Ticket:** `V4-004`
+
+**Publishable version:** `v4.3.0`
+
+**Status:** Planned.
+
 **Outcome:** GitPulse becomes a recurring review ritual.
 
 **Scope:**
@@ -87,6 +125,12 @@
 **Commit:** `feat(recaps): add weekly recap`
 
 ### Milestone 5: Watchlists And Compare Mode
+
+**Ticket:** `V4-005`
+
+**Publishable version:** `v4.4.0`
+
+**Status:** Planned.
 
 **Outcome:** users track the parts of the codebase they care about.
 
@@ -106,6 +150,12 @@
 
 ### Milestone 6: Shareable Reports
 
+**Ticket:** `V4-006`
+
+**Publishable version:** `v4.5.0`
+
+**Status:** Planned.
+
 **Outcome:** users can bring GitPulse into retros, standups, OSS updates, and handoffs.
 
 **Scope:**
@@ -123,6 +173,12 @@
 **Commit:** `feat(exports): add markdown reports`
 
 ### Milestone 7: Habit And Delight Polish
+
+**Ticket:** `V4-007`
+
+**Publishable version:** `v4.6.0`
+
+**Status:** Planned.
 
 **Outcome:** the app feels alive without becoming noisy.
 
