@@ -10,6 +10,19 @@
 
 ---
 
+## Implementation Status
+
+- [x] V2-T1 Shared Analysis Scope: `26b40c0 feat(ui): add analysis scope selector`
+- [x] V2-T2 Scoped Developer Stats: `2737c21 feat(stats): scope developer stats by repo or workspace`
+- [x] V2-T3 Time Range Filters: `31de0f4 feat(ui): add time range filters`
+- [x] V2-T4 Range-Aware File And Developer Queries: `6f83eac feat(stats): add range aware analytics queries`
+- [x] V2-T5 Complete Dashboard PRD View: `3cf1b34 feat(dashboard): add top files and activity timeline`
+- [x] V2-T6 Branch Switching After Repo Add: `5bbfa27 feat(ui): enable branch switching after repo add`
+- [x] V2-T7 Alias Reassignment UI: `944c82b feat(ui): expose alias reassignment`
+- [x] V2-T8 Documentation And Final Verification: completed on 2026-04-26.
+
+---
+
 ## Baseline
 
 - Current branch for this work: `prd-v2-polish`.
@@ -33,6 +46,8 @@
 ---
 
 ## Ticket V2-T1: Shared Analysis Scope
+
+**Status:** Done in `26b40c0 feat(ui): add analysis scope selector`.
 
 **Purpose:** create a shared frontend model for choosing between selected repo and all repos in the selected workspace.
 
@@ -61,6 +76,8 @@
 ---
 
 ## Ticket V2-T2: Scoped Developer Stats
+
+**Status:** Done in `2737c21 feat(stats): scope developer stats by repo or workspace`.
 
 **Purpose:** stop using cross-workspace developer totals in Dashboard, Developers, and Box Score developer selectors.
 
@@ -96,6 +113,8 @@
 
 ## Ticket V2-T3: Time Range Filters
 
+**Status:** Done in `31de0f4 feat(ui): add time range filters`.
+
 **Purpose:** implement PRD time filters: all time, custom range, last 7/14/30/90 days, week navigation, and month navigation.
 
 **Files:**
@@ -128,6 +147,8 @@
 
 ## Ticket V2-T4: Range-Aware File And Developer Queries
 
+**Status:** Done in `6f83eac feat(stats): add range aware analytics queries`.
+
 **Purpose:** make file, directory, developer, and timeline stats respect the selected time range.
 
 **Files:**
@@ -152,6 +173,8 @@
 ---
 
 ## Ticket V2-T5: Complete Dashboard PRD View
+
+**Status:** Done in `3cf1b34 feat(dashboard): add top files and activity timeline`.
 
 **Purpose:** dashboard shows overview, top developers, top files, and an activity timeline.
 
@@ -178,6 +201,8 @@
 
 ## Ticket V2-T6: Branch Switching After Repo Add
 
+**Status:** Done in `5bbfa27 feat(ui): enable branch switching after repo add`.
+
 **Purpose:** make the repo branch selector real after a repo is added.
 
 **Files:**
@@ -202,6 +227,8 @@
 ---
 
 ## Ticket V2-T7: Alias Reassignment UI
+
+**Status:** Done in `944c82b feat(ui): expose alias reassignment`.
 
 **Purpose:** expose precise alias reassignment, not only whole-developer merge.
 
@@ -228,6 +255,8 @@
 
 ## Ticket V2-T8: Documentation And Final Verification
 
+**Status:** Done. Final verification passed on 2026-04-26.
+
 **Purpose:** keep docs honest and prove the full branch is stable.
 
 **Files:**
@@ -235,10 +264,10 @@
 - Modify: `docs/development-plan-v2.md` statuses.
 
 **Verification:**
-- [ ] `pnpm exec jest --runInBand`
-- [ ] `pnpm build`
-- [ ] `cargo test`
-- [ ] `cargo clippy --all-targets -- -D warnings`
+- [x] `pnpm exec jest --runInBand`: 99 passed.
+- [x] `pnpm build`: passed.
+- [x] `cargo test`: 133 passed, 1 ignored benchmark.
+- [x] `cargo clippy --all-targets -- -D warnings`: passed.
 
 **Acceptance Criteria:**
 - All verification commands exit 0.
