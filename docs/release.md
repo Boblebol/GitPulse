@@ -43,6 +43,11 @@ This document describes how to publish GitPulse desktop releases from the
    ## [0.2.0-rc.1] - YYYY-MM-DD
    ```
 
+   The Tauri app version in `src-tauri/tauri.conf.json` must remain compatible
+   with Windows MSI packaging. For release candidates, use a numeric-only
+   prerelease identifier such as `0.2.0-3` while the Git tag remains
+   `v0.2.0-rc.3`.
+
 4. Run local verification:
 
    ```bash

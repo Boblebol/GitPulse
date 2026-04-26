@@ -9,6 +9,15 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 No unreleased changes yet.
 
+## [0.2.0-rc.3] - 2026-04-26
+
+### Changed
+
+- GitHub Pages workflow now enables Pages automatically when the repository is
+  configured to deploy from GitHub Actions.
+- Windows MSI builds now use the Tauri app version `0.2.0-3` because the MSI
+  target requires numeric-only prerelease identifiers.
+
 ## [0.2.0-rc.2] - 2026-04-26
 
 ### Changed
@@ -61,7 +70,8 @@ No unreleased changes yet.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.2...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.3...HEAD
+[0.2.0-rc.3]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.2...v0.2.0-rc.3
 [0.2.0-rc.2]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/Boblebol/GitPulse/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/Boblebol/GitPulse/releases/tag/v0.1.0

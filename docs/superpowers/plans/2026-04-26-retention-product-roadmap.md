@@ -24,7 +24,8 @@
 | `v4.5.0` | `V4-006` | Shareable Reports | Shipped in `b3788b8` + `276a4e6` | Markdown exports for Dashboard, Code Health, and recaps. |
 | `v4.6.0` | `V4-007` | Achievements Polish | Shipped in `01e841d` + `c6e9560` | Positive code-health achievements with ignorable local nudges. |
 | `v0.2.0-rc.1` | `V4-008` | Open Source Release Candidate | Shipped in `bc34aec` | OSS hygiene, RC versions, changelog, and prerelease workflow. |
-| `v0.2.0-rc.2` | `V4-009` | Public Downloads Release Candidate | Prepared for tag | Published prereleases and desktop artifacts from CI. |
+| `v0.2.0-rc.2` | `V4-009` | Public Downloads Release Candidate | Superseded by `v0.2.0-rc.3` | Published prereleases and desktop artifacts from CI. |
+| `v0.2.0-rc.3` | `V4-010` | Pages And Windows RC Fix | In progress | Pages auto-enablement and MSI-compatible RC app version. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
 
@@ -309,6 +310,31 @@ desktop builds.
 - Pages workflow is retriggered after the repository is public.
 
 **Commit:** `ci: publish desktop release downloads`
+
+### Milestone 10: Pages And Windows RC Fix
+
+**Ticket:** `V4-010`
+
+**Publishable version:** `v0.2.0-rc.3`
+
+**Status:** In progress.
+
+**Outcome:** GitHub Pages deploys from Actions and Windows MSI bundles build
+for the release candidate.
+
+**Scope:**
+
+- Enable Pages from the workflow when the repository is public.
+- Keep the release tag as `v0.2.0-rc.3`.
+- Use a numeric-only Tauri app prerelease version for MSI compatibility.
+
+**Acceptance:**
+
+- Pages workflow reaches deploy instead of failing in `configure-pages`.
+- Windows release job passes MSI packaging.
+- Release downloads are visible from the prerelease page.
+
+**Commit:** `ci: fix pages and windows rc bundles`
 
 ---
 
