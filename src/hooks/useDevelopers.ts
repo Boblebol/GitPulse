@@ -4,11 +4,23 @@ import type { DeveloperWithAliases } from "../types";
 
 const DEV_KEY = ["developers"] as const;
 const UNREVIEWED_KEY = ["developers", "unreviewed"] as const;
+const STATS_KEYS = [
+  "stats",
+  "activity_timeline",
+  "daily_stats",
+  "file_stats",
+  "directory_stats",
+  "leaderboard",
+  "box_score",
+] as const;
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: DEV_KEY });
-  // Also re-run stats since merges affect aggregates
-  qc.invalidateQueries({ queryKey: ["stats"] });
+  qc.invalidateQueries({ queryKey: UNREVIEWED_KEY });
+
+  for (const key of STATS_KEYS) {
+    qc.invalidateQueries({ queryKey: [key] });
+  }
 }
 
 export function useDevelopers() {

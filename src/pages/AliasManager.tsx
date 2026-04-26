@@ -1,19 +1,43 @@
 import { useState } from "react";
-import { useUnreviewedDevelopers, useDevelopers, useMergeDevelopers } from "../hooks/useDevelopers";
-import { GitMerge, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  useUnreviewedDevelopers,
+  useDevelopers,
+  useMergeDevelopers,
+  useReassignAlias,
+} from "../hooks/useDevelopers";
+import { GitMerge, AlertCircle, ChevronDown, ChevronUp, MoveRight } from "lucide-react";
+import type { Alias } from "../types";
 
 export default function AliasManager() {
   const { data: unreviewed = [] } = useUnreviewedDevelopers();
   const { data: allDevs = [] } = useDevelopers();
   const merge = useMergeDevelopers();
+  const reassign = useReassignAlias();
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Record<string, string>>({});
+  const [aliasTarget, setAliasTarget] = useState<Record<string, string>>({});
+
+  function aliasLabel(alias: Alias) {
+    return `${alias.git_name} <${alias.git_email}>`;
+  }
 
   function doMerge(sourceId: string) {
     const targetId = mergeTarget[sourceId];
     if (!targetId) return;
     merge.mutate({ sourceId, targetId });
+  }
+
+  function doReassign(aliasId: string) {
+    const targetDeveloperId = aliasTarget[aliasId];
+    if (!targetDeveloperId) return;
+    reassign.mutate(
+      { aliasId, targetDeveloperId },
+      {
+        onSuccess: () =>
+          setAliasTarget((prev) => ({ ...prev, [aliasId]: "" })),
+      }
+    );
   }
 
   return (
@@ -85,10 +109,44 @@ export default function AliasManager() {
                   {/* Alias list */}
                   <div className="space-y-1">
                     {dev.aliases.map((a) => (
-                      <div key={a.id} className="flex items-center gap-2 text-sm">
-                        <span className="text-on-surface font-mono">{a.git_name}</span>
-                        <span className="text-on-surface-variant">·</span>
-                        <span className="text-on-surface-variant">{a.git_email}</span>
+                      <div
+                        key={a.id}
+                        className="flex flex-col gap-2 rounded-md bg-surface-container/60 px-3 py-2 text-sm sm:flex-row sm:items-center"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="text-on-surface font-mono">{a.git_name}</span>
+                          <span className="text-on-surface-variant mx-2">·</span>
+                          <span className="text-on-surface-variant break-all">{a.git_email}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <select
+                            aria-label={`Move ${aliasLabel(a)} to`}
+                            value={aliasTarget[a.id] ?? ""}
+                            onChange={(e) =>
+                              setAliasTarget((prev) => ({
+                                ...prev,
+                                [a.id]: e.target.value,
+                              }))
+                            }
+                            className="min-w-0 max-w-[180px] bg-surface-container-high text-on-surface text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary/40"
+                          >
+                            <option value="">Move to...</option>
+                            {allDevs
+                              .filter((d) => d.id !== dev.id)
+                              .map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                          </select>
+                          <button
+                            aria-label={`Move alias ${aliasLabel(a)}`}
+                            disabled={!aliasTarget[a.id] || reassign.isPending}
+                            onClick={() => doReassign(a.id)}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-primary gradient-primary disabled:opacity-40 transition-opacity"
+                          >
+                            <MoveRight size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -122,6 +180,9 @@ export default function AliasManager() {
 
                   {merge.isError && (
                     <p className="text-xs text-error">{merge.error}</p>
+                  )}
+                  {reassign.isError && (
+                    <p className="text-xs text-error">{reassign.error}</p>
                   )}
                 </div>
               )}
