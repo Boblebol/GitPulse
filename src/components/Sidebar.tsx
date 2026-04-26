@@ -12,6 +12,7 @@ import {
   HeartPulse,
   HelpCircle,
   Settings,
+  Sparkles,
   Zap,
 } from "lucide-react";
 import { useWorkspaces } from "../hooks/useRepos";
@@ -42,6 +43,9 @@ export default function Sidebar() {
     analysisScopeMode,
     setAnalysisScopeMode,
     openProductTour,
+    isDemoMode,
+    enableDemoMode,
+    disableDemoMode,
   } = useAppContext();
   const { data: workspaces = [] } = useWorkspaces();
   const { data: repos = [] } = useRepos(workspaceId);
@@ -83,6 +87,15 @@ export default function Sidebar() {
 
       {/* Repo selector */}
       <div className="px-3 pb-4 pt-3 space-y-2 border-t border-outline-variant/15">
+        <button
+          type="button"
+          onClick={isDemoMode ? disableDemoMode : enableDemoMode}
+          className="flex w-full items-center gap-2 rounded-lg bg-primary-container px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-surface-container-high hover:text-on-surface"
+        >
+          <Sparkles size={15} />
+          {isDemoMode ? "Exit Demo" : "Try Demo"}
+        </button>
+
         <button
           type="button"
           onClick={openProductTour}

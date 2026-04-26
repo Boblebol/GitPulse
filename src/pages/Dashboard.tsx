@@ -5,6 +5,11 @@ import ActivityChart from "../components/ActivityChart";
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
 import {
+  DEMO_ACTIVITY_TIMELINE,
+  DEMO_DEVELOPER_STATS,
+  DEMO_TOP_FILES,
+} from "../data/demo";
+import {
   AlertCircle,
   CheckCircle2,
   Clock,
@@ -36,6 +41,9 @@ export default function Dashboard() {
     scanningRepoId,
     setScanningRepoId,
     setSyncStatus,
+    isDemoMode,
+    enableDemoMode,
+    disableDemoMode,
   } = useAppContext();
   const dateRange = timeRangeToQuery(timeRange);
   const { data: devStats = [], isLoading } = useDeveloperGlobalStats(
@@ -44,6 +52,11 @@ export default function Dashboard() {
   );
   const { data: activityRows = [] } = useActivityTimeline(analysisScope, dateRange);
   const { data: topFiles = [], isLoading: loadingFiles } = useFileStats(repoId, dateRange);
+  const displayedDevStats = isDemoMode ? DEMO_DEVELOPER_STATS : devStats;
+  const displayedActivityRows = isDemoMode ? DEMO_ACTIVITY_TIMELINE : activityRows;
+  const displayedTopFiles = isDemoMode ? DEMO_TOP_FILES : topFiles;
+  const loadingContributors = isDemoMode ? false : isLoading;
+  const loadingTopFiles = isDemoMode ? false : loadingFiles;
   const scan = useTriggerScan();
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();
@@ -103,9 +116,10 @@ export default function Dashboard() {
   };
 
   const hasAnalysisTarget =
-    analysisScopeMode === "workspace" ? workspaceId != null : repoId != null;
-  const activityData = activityRowsToChartPoints(activityRows);
-  const activityTotals = activityRows.reduce(
+    isDemoMode ||
+    (analysisScopeMode === "workspace" ? workspaceId != null : repoId != null);
+  const activityData = activityRowsToChartPoints(displayedActivityRows);
+  const activityTotals = displayedActivityRows.reduce(
     (acc, row) => ({
       commits: acc.commits + row.commits,
       insertions: acc.insertions + row.insertions,
@@ -114,7 +128,7 @@ export default function Dashboard() {
     { commits: 0, insertions: 0, deletions: 0 },
   );
 
-  const totals = devStats.reduce(
+  const totals = displayedDevStats.reduce(
     (acc, d) => ({
       commits:    acc.commits    + d.total_commits,
       insertions: acc.insertions + d.total_insertions,
@@ -123,17 +137,17 @@ export default function Dashboard() {
     { commits: 0, insertions: 0, deletions: 0 },
   );
 
-  const maxCommits = devStats.length > 0
-    ? Math.max(...devStats.map((d) => d.total_commits))
+  const maxCommits = displayedDevStats.length > 0
+    ? Math.max(...displayedDevStats.map((d) => d.total_commits))
     : 1;
 
   // Most recent committer (by last_commit_at)
-  const mostRecent = devStats
+  const mostRecent = displayedDevStats
     .filter((d) => d.last_commit_at)
     .sort((a, b) => (b.last_commit_at! > a.last_commit_at! ? 1 : -1))[0];
 
   // Best streak holder
-  const streakHolder = devStats.reduce<typeof devStats[0] | null>(
+  const streakHolder = displayedDevStats.reduce<typeof displayedDevStats[0] | null>(
     (best, d) => (!best || d.longest_streak > best.longest_streak ? d : best),
     null,
   );
@@ -243,10 +257,35 @@ export default function Dashboard() {
         </div>
       )}
 
+      {isDemoMode && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-primary-container px-4 py-3 text-primary">
+          <div>
+            <p className="text-sm font-semibold">Demo Mode</p>
+            <p className="text-xs opacity-80">
+              Sample data is shown locally. Add and scan a repository to replace it.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={disableDemoMode}
+            className="rounded-full bg-surface-container-highest px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container"
+          >
+            Exit Demo
+          </button>
+        </div>
+      )}
+
       {/* No repo selected */}
       {!hasAnalysisTarget && (
         <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
-          Select a workspace and repository in the sidebar to get started.
+          <p>Select a workspace and repository in the sidebar to get started.</p>
+          <button
+            type="button"
+            onClick={enableDemoMode}
+            className="mt-4 rounded-full px-4 py-2 text-sm font-semibold text-on-primary gradient-primary"
+          >
+            Try Demo
+          </button>
         </div>
       )}
 
@@ -351,15 +390,15 @@ export default function Dashboard() {
             >
               Top Contributors
             </h2>
-            {isLoading ? (
+            {loadingContributors ? (
               <div className="text-on-surface-variant text-sm">Loading…</div>
-            ) : devStats.length === 0 ? (
+            ) : displayedDevStats.length === 0 ? (
               <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant text-sm">
                 No data yet. Sync a repository first.
               </div>
             ) : (
               <div className="space-y-2">
-                {devStats.slice(0, 8).map((d, i) => {
+                {displayedDevStats.slice(0, 8).map((d, i) => {
                   const barPct = maxCommits > 0
                     ? (d.total_commits / maxCommits) * 100
                     : 0;
@@ -439,15 +478,15 @@ export default function Dashboard() {
             >
               Top Files
             </h2>
-            {loadingFiles ? (
+            {loadingTopFiles ? (
               <div className="text-on-surface-variant text-sm">Loading…</div>
-            ) : topFiles.length === 0 ? (
+            ) : displayedTopFiles.length === 0 ? (
               <div className="rounded-lg bg-surface-container-low p-6 text-center text-on-surface-variant text-sm">
                 No file data for the selected repository and range.
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-                {topFiles.slice(0, 8).map((file) => (
+                {displayedTopFiles.slice(0, 8).map((file) => (
                   <div
                     key={file.file_id}
                     className="flex min-w-0 items-center gap-3 rounded-lg bg-surface-container-high px-4 py-3"

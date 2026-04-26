@@ -106,4 +106,21 @@ describe("ProductTour", () => {
       screen.getByRole("dialog", { name: "GitPulse product tour" }),
     ).toBeInTheDocument();
   });
+
+  it("toggles demo mode from the sidebar", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("gitpulse.productTour.dismissed", "true");
+
+    renderSidebarWithProductTour();
+
+    await user.click(screen.getByRole("button", { name: "Try Demo" }));
+
+    expect(window.localStorage.getItem("gitpulse.demoMode.enabled")).toBe("true");
+    expect(screen.getByRole("button", { name: "Exit Demo" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Exit Demo" }));
+
+    expect(window.localStorage.getItem("gitpulse.demoMode.enabled")).toBeNull();
+    expect(screen.getByRole("button", { name: "Try Demo" })).toBeInTheDocument();
+  });
 });

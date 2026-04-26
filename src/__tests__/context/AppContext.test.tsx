@@ -33,6 +33,18 @@ function ProductTourStateComponent() {
   );
 }
 
+function DemoModeStateComponent() {
+  const { isDemoMode, enableDemoMode, disableDemoMode } = useAppContext();
+
+  return (
+    <div>
+      <div data-testid="demo-mode">{String(isDemoMode)}</div>
+      <button onClick={enableDemoMode}>Enable Demo</button>
+      <button onClick={disableDemoMode}>Disable Demo</button>
+    </div>
+  );
+}
+
 describe("AppContext", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -454,5 +466,51 @@ describe("AppContext", () => {
       expect(screen.getByTestId("tour-open")).toHaveTextContent("true");
     });
     expect(window.localStorage.getItem("gitpulse.productTour.dismissed")).toBeNull();
+  });
+
+  it("keeps demo mode disabled by default", () => {
+    render(
+      <AppProvider>
+        <DemoModeStateComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("demo-mode")).toHaveTextContent("false");
+  });
+
+  it("persists demo mode enable and disable actions", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AppProvider>
+        <DemoModeStateComponent />
+      </AppProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Enable Demo" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("demo-mode")).toHaveTextContent("true");
+    });
+    expect(window.localStorage.getItem("gitpulse.demoMode.enabled")).toBe("true");
+
+    await user.click(screen.getByRole("button", { name: "Disable Demo" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("demo-mode")).toHaveTextContent("false");
+    });
+    expect(window.localStorage.getItem("gitpulse.demoMode.enabled")).toBeNull();
+  });
+
+  it("restores demo mode from local storage", () => {
+    window.localStorage.setItem("gitpulse.demoMode.enabled", "true");
+
+    render(
+      <AppProvider>
+        <DemoModeStateComponent />
+      </AppProvider>
+    );
+
+    expect(screen.getByTestId("demo-mode")).toHaveTextContent("true");
   });
 });

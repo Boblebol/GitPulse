@@ -5,6 +5,11 @@ import {
   markProductTourDismissed,
   resetProductTourDismissed,
 } from "../utils/productTour";
+import {
+  clearDemoModeEnabled,
+  isDemoModeEnabled,
+  markDemoModeEnabled,
+} from "../utils/demoMode";
 import { createTimeRange } from "../utils/timeRange";
 
 interface Notification {
@@ -37,6 +42,9 @@ interface AppContextValue {
   openProductTour: () => void;
   dismissProductTour: () => void;
   resetProductTour: () => void;
+  isDemoMode: boolean;
+  enableDemoMode: () => void;
+  disableDemoMode: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -54,6 +62,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isProductTourOpen, setIsProductTourOpen] = useState<boolean>(
     () => !hasDismissedProductTour(),
   );
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => isDemoModeEnabled());
 
   const updateWorkspaceId = (id: string | null) => {
     setWorkspaceId(id);
@@ -115,6 +124,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsProductTourOpen(true);
   };
 
+  const enableDemoMode = () => {
+    markDemoModeEnabled();
+    setIsDemoMode(true);
+  };
+
+  const disableDemoMode = () => {
+    clearDemoModeEnabled();
+    setIsDemoMode(false);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -141,6 +160,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         openProductTour,
         dismissProductTour,
         resetProductTour,
+        isDemoMode,
+        enableDemoMode,
+        disableDemoMode,
       }}
     >
       {children}
