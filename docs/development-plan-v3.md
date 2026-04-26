@@ -10,6 +10,15 @@
 
 ---
 
+## Implementation Status
+
+- [x] V3 plan documented: `50af40a docs: add v3 historical health plan`
+- [x] Backend historical analytics and code-health commands: `0b01150 feat(stats): add v3 historical and health commands`
+- [x] Frontend hooks and pages for Seasons, Awards, Records, and Code Health: `4249532 feat(ui): add v3 analytics views`
+- [ ] Later advanced metrics: context switching, focus score, review risk proxy, refactor/feature signal, code volatility, coupling graph.
+
+---
+
 ## Product Principles
 
 - Keep all stats scoped by selected repo or selected workspace.
@@ -75,6 +84,8 @@ Scores are 0-100 where practical. Raw component values remain exposed in respons
 
 ## Ticket V3-T1: Period Engine
 
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands`.
+
 **Purpose:** normalize month, quarter, calendar year, season, and all-time date bounds.
 
 **Files:**
@@ -102,6 +113,8 @@ Scores are 0-100 where practical. Raw component values remain exposed in respons
 ---
 
 ## Ticket V3-T2: Historical Leaderboards
+
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands`.
 
 **Purpose:** provide NBA-style period rankings for developers.
 
@@ -146,6 +159,8 @@ Scores are 0-100 where practical. Raw component values remain exposed in respons
 
 ## Ticket V3-T3: Awards
 
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands` and exposed in `4249532 feat(ui): add v3 analytics views`.
+
 **Purpose:** generate monthly/yearly awards per repo or workspace.
 
 **Backend Command:**
@@ -173,6 +188,8 @@ Scores are 0-100 where practical. Raw component values remain exposed in respons
 
 ## Ticket V3-T4: Records
 
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands` and exposed in `4249532 feat(ui): add v3 analytics views`.
+
 **Purpose:** expose career, repo, workspace, season, and all-time records.
 
 **Backend Command:**
@@ -197,6 +214,8 @@ Scores are 0-100 where practical. Raw component values remain exposed in respons
 ---
 
 ## Ticket V3-T5: Hotspot Score
+
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands` and exposed in `4249532 feat(ui): add v3 analytics views`.
 
 **Purpose:** prioritize files that deserve testing/refactoring attention.
 
@@ -236,6 +255,8 @@ hotspot_score =
 
 ## Ticket V3-T6: Ownership, Bus Factor, And Knowledge Silos
 
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands` and exposed in `4249532 feat(ui): add v3 analytics views`.
+
 **Purpose:** show where code knowledge is concentrated.
 
 **Rules:**
@@ -254,6 +275,8 @@ hotspot_score =
 ---
 
 ## Ticket V3-T7: Directory Health Score
+
+**Status:** Done in `0b01150 feat(stats): add v3 historical and health commands` and exposed in `4249532 feat(ui): add v3 analytics views`.
 
 **Purpose:** summarize code health by directory.
 
@@ -289,6 +312,8 @@ directory_health_score =
 
 ## Ticket V3-T8: Frontend Hooks And Types
 
+**Status:** Done in `4249532 feat(ui): add v3 analytics views`.
+
 **Purpose:** expose V3 commands to React without tying UI to raw invoke calls.
 
 **Files:**
@@ -309,6 +334,8 @@ directory_health_score =
 ---
 
 ## Ticket V3-T9: Frontend Pages
+
+**Status:** Done in `4249532 feat(ui): add v3 analytics views`.
 
 **Purpose:** add pages for seasons, awards, records, and code health.
 
@@ -332,6 +359,8 @@ directory_health_score =
 ---
 
 ## Ticket V3-T10: Later Advanced Metrics
+
+**Status:** Pending.
 
 **Purpose:** extend V3 after MVP.
 
@@ -414,8 +443,8 @@ Owns:
 
 ## Verification
 
-- `pnpm exec jest --runInBand`
-- `pnpm build`
-- `cargo test` in `src-tauri`
-- `cargo clippy --all-targets -- -D warnings` in `src-tauri`
+- [x] `pnpm exec jest --runInBand`: 106 passed.
+- [x] `pnpm build`: passed.
+- [x] `cargo test` in `src-tauri`: 147 passed, 1 ignored benchmark.
+- [x] `cargo clippy --all-targets -- -D warnings` in `src-tauri`: passed.
 - optional `pnpm run site:build` if Pages docs are updated
