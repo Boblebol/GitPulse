@@ -6,7 +6,8 @@ This document describes how to publish GitPulse desktop releases from the
 ## Release Model
 
 - `master` is the release branch used by CI, GitHub Pages, and release workflows.
-- Releases are created from Git tags named `vX.Y.Z`.
+- Stable releases are created from Git tags named `vX.Y.Z`.
+- Release candidates are created from Git tags named `vX.Y.Z-rc.N`.
 - `CHANGELOG.md` is edited manually before a tag is created.
 - The GitHub Actions release workflow creates a draft GitHub Release and uploads
   packaged Tauri artifacts.
@@ -23,6 +24,8 @@ This document describes how to publish GitPulse desktop releases from the
 
    - `package.json`
    - `src-tauri/tauri.conf.json`
+   - `src-tauri/Cargo.toml`
+   - `src-tauri/Cargo.lock`
    - any future package metadata that carries the product version
 
 3. Move relevant entries from `CHANGELOG.md` `Unreleased` into a new version
@@ -30,6 +33,12 @@ This document describes how to publish GitPulse desktop releases from the
 
    ```markdown
    ## [0.2.0] - YYYY-MM-DD
+   ```
+
+   For a release candidate, use:
+
+   ```markdown
+   ## [0.2.0-rc.1] - YYYY-MM-DD
    ```
 
 4. Run local verification:
@@ -46,8 +55,14 @@ This document describes how to publish GitPulse desktop releases from the
 5. Commit the version and changelog changes:
 
    ```bash
-   git add package.json src-tauri/tauri.conf.json CHANGELOG.md
+   git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock CHANGELOG.md
    git commit -m "chore(release): prepare v0.2.0"
+   ```
+
+   For a release candidate, use:
+
+   ```bash
+   git commit -m "chore(release): prepare v0.2.0-rc.1"
    ```
 
 ## Publish A Release
@@ -58,6 +73,12 @@ This document describes how to publish GitPulse desktop releases from the
    git tag v0.2.0
    ```
 
+   For a release candidate:
+
+   ```bash
+   git tag v0.2.0-rc.1
+   ```
+
 2. Push `master` and the tag:
 
    ```bash
@@ -65,10 +86,17 @@ This document describes how to publish GitPulse desktop releases from the
    git push origin v0.2.0
    ```
 
+   Or for a release candidate:
+
+   ```bash
+   git push origin v0.2.0-rc.1
+   ```
+
 3. Wait for the `Release` workflow to finish.
 
 4. Open the draft GitHub Release, review generated assets, paste or refine
-   release notes from `CHANGELOG.md`, then publish the release.
+   release notes from `CHANGELOG.md`, then publish the release. Tags containing
+   `-rc.` are marked as prereleases by the workflow.
 
 ## Manual Desktop Builds
 

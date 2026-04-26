@@ -3,9 +3,13 @@
 All notable changes to GitPulse are documented here.
 
 This project follows a pragmatic Keep a Changelog format. Versions use Git tags
-named `vX.Y.Z`.
+named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
+
+No unreleased changes yet.
+
+## [0.2.0-rc.1] - 2026-04-26
 
 ### Added
 
@@ -24,6 +28,8 @@ named `vX.Y.Z`.
 - Manual desktop build workflow for packaged Tauri artifacts.
 - Tag-driven release workflow for GitHub Release drafts.
 - Release process documentation in `docs/release.md`.
+- Open source project files: MIT license, contributing guide, security policy,
+  code of conduct, issue templates, and pull request template.
 
 ## [0.1.0] - 2026-04-26
 
@@ -45,5 +51,6 @@ named `vX.Y.Z`.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.1...HEAD
+[0.2.0-rc.1]: https://github.com/Boblebol/GitPulse/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/Boblebol/GitPulse/releases/tag/v0.1.0

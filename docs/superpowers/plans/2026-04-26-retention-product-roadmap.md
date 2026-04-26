@@ -23,6 +23,7 @@
 | `v4.4.0` | `V4-005` | Watchlists And Compare | Shipped in `9fb7d4c` + `9f0bbbb` + `0d06ed3` | Watch files/directories/repos and compare periods. |
 | `v4.5.0` | `V4-006` | Shareable Reports | Shipped in `b3788b8` + `276a4e6` | Markdown exports for Dashboard, Code Health, and recaps. |
 | `v4.6.0` | `V4-007` | Achievements Polish | Shipped in `01e841d` + `c6e9560` | Positive code-health achievements with ignorable local nudges. |
+| `v0.2.0-rc.1` | `V4-008` | Open Source Release Candidate | Prepared for tag | OSS hygiene, RC versions, changelog, and prerelease workflow. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
 
@@ -254,6 +255,33 @@ Release rule: each version must be independently useful, tested, and documented 
 - Tests cover the achievement engine and the Achievements page dismissal flow.
 
 **Commit:** `feat(achievements): add code health achievements`
+
+### Milestone 8: Open Source Release Candidate
+
+**Ticket:** `V4-008`
+
+**Publishable version:** `v0.2.0-rc.1`
+
+**Status:** Prepared for `v0.2.0-rc.1` tag.
+
+**Outcome:** GitPulse is ready for external contributors and release-candidate
+desktop builds.
+
+**Scope:**
+
+- MIT license and project governance files.
+- Bug report, feature request, and pull request templates.
+- Version bump across frontend, Tauri, and Cargo metadata.
+- Changelog section for `v0.2.0-rc.1`.
+- Release workflow marks `-rc.` tags as prereleases.
+
+**Acceptance:**
+
+- Repository has the minimum public open source project files.
+- Local verification passes before the RC tag is pushed.
+- `v0.2.0-rc.1` creates a draft prerelease with desktop artifacts.
+
+**Commit:** `chore(release): prepare v0.2.0-rc.1`
 
 ---
 

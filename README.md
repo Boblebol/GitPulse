@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Boblebol/GitPulse/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Boblebol/GitPulse/actions/workflows/ci.yml)
 [![GitHub Pages](https://github.com/Boblebol/GitPulse/actions/workflows/pages.yml/badge.svg?branch=master)](https://github.com/Boblebol/GitPulse/actions/workflows/pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 GitPulse is a local Tauri 2 desktop app for analyzing Git repository activity.
 It indexes local repositories into SQLite, aggregates developer/file/directory
@@ -94,10 +95,17 @@ GITPULSE_BENCH_COMMITS=5000 GITPULSE_BENCH_FILES_PER_COMMIT=3 \
 ## Releases
 
 Releases are prepared from the `master` branch and published by pushing tags
-named `vX.Y.Z`. The release workflow builds Linux, macOS, and Windows desktop
-artifacts, then attaches them to a draft GitHub Release.
+named `vX.Y.Z` or release-candidate tags such as `vX.Y.Z-rc.N`. The release
+workflow builds Linux, macOS, and Windows desktop artifacts, then attaches them
+to a draft GitHub Release.
 
 See [docs/release.md](docs/release.md) and [CHANGELOG.md](CHANGELOG.md).
+
+## Contributing
+
+GitPulse is MIT licensed. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+before opening issues or pull requests.
 
 ## Current Architecture
 

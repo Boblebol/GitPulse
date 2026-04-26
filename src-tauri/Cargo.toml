@@ -1,8 +1,10 @@
 [package]
 name = "gitpulse"
-version = "0.1.0"
+version = "0.2.0-rc.1"
 description = "GitPulse — local Git repository analyser"
-authors = ["you"]
+authors = ["Boblebol"]
+license = "MIT"
+repository = "https://github.com/Boblebol/GitPulse"
 edition = "2021"
 
 [lib]

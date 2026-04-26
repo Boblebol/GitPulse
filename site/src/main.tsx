@@ -82,6 +82,8 @@ const docs = [
   ["Retention roadmap", "Versioned plan for tours, demo mode, insights, recaps, and return workflows.", `${repoUrl}/blob/master/docs/superpowers/plans/2026-04-26-retention-product-roadmap.md`],
   ["Release process", "How maintainers prepare tags and publish desktop builds.", `${repoUrl}/blob/master/docs/release.md`],
   ["Changelog", "Human-readable release history.", `${repoUrl}/blob/master/CHANGELOG.md`],
+  ["Contributing", "Development rules, verification commands, and product principles.", `${repoUrl}/blob/master/CONTRIBUTING.md`],
+  ["Security", "How to report security-sensitive local app issues.", `${repoUrl}/blob/master/SECURITY.md`],
 ];
 
 const tutorials = [

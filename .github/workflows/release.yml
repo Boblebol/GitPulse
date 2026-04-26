@@ -62,6 +62,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: GitPulse ${{ github.ref_name }}
-          releaseBody: See CHANGELOG.md for release notes.
+          releaseBody: See CHANGELOG.md for release notes and upgrade notes.
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-rc.') }}
