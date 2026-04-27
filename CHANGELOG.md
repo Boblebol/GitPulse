@@ -7,6 +7,14 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+## [0.2.0-rc.7] - 2026-04-27
+
+### Fixed
+
+- Git scan rename handling now avoids `UNIQUE constraint failed:
+  files.repo_id, files.current_path` when a rename target path already exists
+  in the local file index.
+
 ## [0.2.0-rc.6] - 2026-04-27
 
 ### Added
@@ -105,7 +113,8 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.6...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.7...HEAD
+[0.2.0-rc.7]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.6...v0.2.0-rc.7
 [0.2.0-rc.6]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.5...v0.2.0-rc.6
 [0.2.0-rc.5]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.4...v0.2.0-rc.5
 [0.2.0-rc.4]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.3...v0.2.0-rc.4

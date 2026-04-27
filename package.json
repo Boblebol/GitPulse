@@ -1,7 +1,7 @@
 {
   "name": "gitpulse",
   "private": true,
-  "version": "0.2.0-rc.6",
+  "version": "0.2.0-rc.7",
   "description": "Local-first Git repository analytics desktop app.",
   "license": "MIT",
   "repository": {
