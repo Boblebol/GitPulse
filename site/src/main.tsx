@@ -77,6 +77,7 @@ const features = [
 const docs = [
   ["README", "Setup, development commands, architecture summary.", `${repoUrl}/blob/master/README.md`],
   ["PRD", "Product requirements and core feature scope.", `${repoUrl}/blob/master/prd_md.md`],
+  ["Design", "App palette, icon direction, landing parity, and destructive data UX.", `${repoUrl}/blob/master/DESIGN.md`],
   ["Architecture", "Repository architecture notes and implementation context.", `${repoUrl}/blob/master/architecture_md.md`],
   ["V2 plan", "Completed plan for scoped stats, time filters, dashboard, branches, and aliases.", `${repoUrl}/blob/master/docs/development-plan-v2.md`],
   ["Retention roadmap", "Versioned plan for tours, demo mode, insights, recaps, and return workflows.", `${repoUrl}/blob/master/docs/superpowers/plans/2026-04-26-retention-product-roadmap.md`],
@@ -90,6 +91,10 @@ const tutorials = [
   {
     title: "Install locally",
     steps: ["Install Rust and Tauri prerequisites.", "Run pnpm install.", "Start the desktop app with pnpm tauri dev."],
+  },
+  {
+    title: "Open unsigned macOS builds",
+    steps: ["Drag GitPulse.app to /Applications.", "Run xattr -cr /Applications/GitPulse.app in Terminal.", "Open the app again from Finder or Spotlight."],
   },
   {
     title: "Scan your first repo",
@@ -141,6 +146,7 @@ const commands = [
   ["Install", "pnpm install"],
   ["Run web UI", "pnpm dev"],
   ["Run desktop app", "pnpm tauri dev"],
+  ["Clear macOS quarantine", "xattr -cr /Applications/GitPulse.app"],
   ["Frontend tests", "pnpm exec jest --runInBand"],
   ["Frontend build", "pnpm build"],
   ["Docs site build", "pnpm run site:build"],
@@ -313,6 +319,7 @@ function App() {
           <h2>Tag-driven desktop publishing.</h2>
           <p>
             A `vX.Y.Z` tag starts the release workflow. GitHub Actions builds Linux, macOS, and Windows bundles, attaches them to the matching GitHub Release, and publishes release candidates as prereleases.
+            macOS builds are unsigned for now, so users may need to clear quarantine with `xattr -cr /Applications/GitPulse.app` after installing.
           </p>
           <div className="hero-actions compact">
             <a className="button primary" href={`${repoUrl}/releases`}>

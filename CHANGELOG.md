@@ -7,10 +7,24 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+### Added
+
+- Settings now includes a confirmed "Delete all my data" action that clears
+  local SQLite app data and GitPulse browser storage without touching scanned
+  Git repositories.
+- The app icon now uses the Git branch symbol inside an orange basketball,
+  generated into Tauri desktop icon assets.
+- Design documentation now captures the app palette, icon direction, landing
+  parity, and destructive data-reset UX.
+
 ### Changed
 
 - GitHub Actions workflows now use Node 24-compatible action versions to avoid
   Node 20 deprecation warnings.
+- The GitHub Pages landing page now matches the dark navy and orange app
+  palette instead of the previous teal/green visual treatment.
+- Release docs and the landing page now explain the unsigned macOS install
+  step: `xattr -cr /Applications/GitPulse.app`.
 
 ## [0.2.0-rc.5] - 2026-04-26
 

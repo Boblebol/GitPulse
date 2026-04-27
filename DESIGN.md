@@ -1,80 +1,107 @@
-# Design System Document: The Courtside Editorial
- 
-## 1. Overview & Creative North Star
-### The Creative North Star: "Kinetic Precision"
-This design system moves away from the static, spreadsheet-like nature of traditional sports data. Instead, it adopts the persona of a **High-End Digital Broadcaster**. The aesthetic is "Kinetic Precision"—capturing the raw, aggressive energy of the court through bold typography and high-contrast accents, while maintaining the surgical accuracy required for professional analytics.
- 
-We break the "template" look by rejecting the standard boxy grid. Instead, we utilize **intentional asymmetry**, overlapping "player" elements that break container boundaries, and a typography scale that favors dramatic "Display" moments. The goal is to make the user feel like they are looking at a live broadcast feed, not a database.
- 
----
- 
-## 2. Colors & Surface Philosophy
-The palette is rooted in the deep shadows of an arena, punctuated by neon-bright highlights that draw the eye to critical performance shifts.
- 
-### The "No-Line" Rule
-**Borders are strictly prohibited for sectioning.** To create separation, use background color shifts. A `surface-container-low` section sitting on a `surface` background provides all the definition needed. If you feel the urge to draw a line, use white space instead.
- 
-### Surface Hierarchy & Nesting
-Depth is built through "Tonal Stacking." Avoid flat layouts by nesting containers:
-*   **Base:** `surface` (#0b1326) – The floor of the arena.
-*   **Sections:** `surface-container-low` (#131b2e) – Large groupings of data.
-*   **Cards:** `surface-container-high` (#222a3d) – Individual stat modules.
-*   **Active/Pop-out:** `surface-container-highest` (#2d3449) – Hover states or focused metrics.
- 
-### The "Glass & Gradient" Rule
-To inject "soul" into the data:
-*   **Glassmorphism:** Use `surface-variant` at 60% opacity with a `20px` backdrop blur for floating headers or player comparison overlays.
-*   **Signature Gradients:** Main Action buttons or "Hot Streak" indicators must use a linear gradient from `primary` (#ffb599) to `primary_container` (#f26522) at a 135-degree angle.
- 
----
- 
-## 3. Typography
-Typography is our primary tool for storytelling. We use three distinct families to create an editorial hierarchy.
- 
-*   **Display & Headlines (Space Grotesk):** This is our "Jersey" font. It is bold, condensed, and aggressive. Use `display-lg` for game scores and `headline-md` for player names. It should feel like it was stenciled onto a locker room wall.
-*   **Titles & Body (Inter):** Our workhorse. Used for narrative descriptions and UI labels. It provides a neutral, high-readability balance to the loud headlines.
-*   **Metrics & Labels (Public Sans):** Chosen for its tabular lining (numbers align perfectly). Every percentage, PER, or PPG metric must use Public Sans to ensure vertical scanning is effortless.
- 
----
- 
-## 4. Elevation & Depth
-In this system, elevation is a product of light and layering, not structural scaffolding.
- 
-*   **The Layering Principle:** Achieve "lift" by placing a `surface-container-lowest` card on top of a `surface-container-low` section. The subtle shift in navy tones creates a natural, sophisticated hierarchy.
-*   **Ambient Shadows:** For floating modals (like a player’s detailed shot chart), use a wide-spread shadow: `0px 24px 48px rgba(6, 14, 32, 0.4)`. The shadow must be a deep navy, never pure black, to maintain the "Dark Theme" richness.
-*   **The Ghost Border Fallback:** For accessibility in high-density tables, use a "Ghost Border": `outline-variant` (#594138) at **15% opacity**. It should be felt, not seen.
- 
----
- 
-## 5. Components
- 
-### Player & Statistic Cards
-*   **Styling:** No borders. Use `lg` (0.5rem) roundedness.
-*   **Visual Flair:** Players' headshots should "break the frame," extending slightly above the top of the card container using a negative margin.
-*   **Background:** Use a subtle radial gradient of `secondary_container` in the corner of the card to highlight the "Primary Stat."
- 
-### Data Tables (The "Box Score")
-*   **Forbid Dividers:** Use `surface-container-low` for even rows and `surface-container-high` for hover states. 
-*   **Highlight Rows:** Use a 2px vertical "accent bar" of `primary` (orange) on the far left of a row to indicate a "Key Performer" or "Live Selection," rather than highlighting the whole row in a bright color.
- 
-### Buttons
-*   **Primary:** Gradient fill (`primary` to `primary_container`), `on_primary` text, `full` roundedness for a sleek, aerodynamic look.
-*   **Secondary:** `outline-variant` (Ghost Border) with `on_surface` text. No fill.
- 
-### Performance Charts
-*   **Positive/Negative:** Use `tertiary` (#4ae176) for "Above Average" and `error` (#ffb4ab) for "Below Average."
-*   **Area Glow:** Line charts should have a subtle glow (drop shadow) of the same color to mimic neon arena lights.
- 
----
- 
-## 6. Do’s and Don’ts
- 
-### Do
-*   **Do** use extreme contrast in typography. Pair a `display-lg` score with a `label-sm` caption.
-*   **Do** embrace "Data Density." Sports fans want the numbers; use `body-sm` for secondary stats to pack information without clutter.
-*   **Do** use `tertiary_container` for positive stat highlights (e.g., a green background pill for a 50% FG shooter).
- 
-### Don’t
-*   **Don't** use pure white (#FFFFFF). Use `on_surface` (#dae2fd) to prevent eye strain on the dark background.
-*   **Don't** use standard 1px borders to separate table cells. It creates visual noise that slows down data ingestion.
-*   **Don't** use rounded corners larger than `xl` (0.75rem) for functional containers; keep it sharp and professional. Only buttons get the `full` pill shape.
+# GitPulse Design
+
+## North Star
+
+GitPulse should feel like a courtside analytics desk for code: dense, fast to
+scan, and energetic without becoming decorative. The app is local-first and
+technical, so the interface should stay work-focused: restrained panels, sharp
+tables, clear controls, and strong orange moments for primary action.
+
+The product surfaces Git history as game-style analytics. Use the sports
+language for energy, not for clutter. The UI should help a maintainer compare
+repositories, inspect code health, clean aliases, and export reports quickly.
+
+## Palette
+
+Use the app palette everywhere, including the GitHub Pages landing page.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `surface` | `#0b1326` | App background and landing base |
+| `surface-container-low` | `#131b2e` | Large sections and sidebars |
+| `surface-container` | `#1a2236` | Cards, form controls, doc links |
+| `surface-container-high` | `#222a3d` | Hover states and raised panels |
+| `surface-container-highest` | `#2d3449` | Active rows and selected panels |
+| `primary` | `#ffb599` | Highlights, icons, chart starts |
+| `primary-container` | `#f26522` | Main orange, CTAs, chart ends |
+| `on-primary` | `#1a0a00` | Text on orange buttons |
+| `on-surface` | `#dae2fd` | Primary text |
+| `on-surface-variant` | `#9ba5c0` | Secondary text |
+| `tertiary` | `#4ae176` | Positive health movement |
+| `error` | `#ffb4ab` | Errors and destructive warnings |
+
+The landing page must not drift into teal, beige, or generic SaaS gradients.
+The product preview should look like the app: navy panels, orange chart bars,
+and pale blue text.
+
+## App Icon
+
+The icon direction is a basketball carrying a Git branch graph. It ties the
+box-score metaphor to Git without adding text that becomes unreadable at small
+sizes.
+
+Source: `src-tauri/icons/gitpulse-basketball.svg`
+
+Generated Tauri assets live in `src-tauri/icons/` and should be regenerated
+from that SVG with:
+
+```bash
+pnpm tauri icon src-tauri/icons/gitpulse-basketball.svg --output src-tauri/icons
+```
+
+Keep the symbol high contrast: orange ball, dark navy app tile, white branch
+nodes, and dark seam lines.
+
+## Layout
+
+- Use full-width page sections or unframed layouts. Cards are for repeated
+  items, modals, and tool surfaces only.
+- Keep card radius at `8px` unless an existing component already uses a pill
+  button.
+- Prefer tonal stacking over heavy borders. When a border is needed, use the
+  ghost outline color at low opacity.
+- Preserve data density. GitPulse is an operational tool, not a marketing
+  dashboard.
+
+## Components
+
+- Primary buttons use the orange gradient from `primary` to
+  `primary-container`, with `on-primary` text.
+- Secondary buttons use a dark surface fill and a ghost outline.
+- Destructive actions use the error palette, explicit explanatory copy, and a
+  native confirmation dialog.
+- Charts use orange for primary activity and green only for positive health or
+  improvement signals.
+- Tables and list rows should show selection with tonal background shifts or a
+  narrow orange accent, not large bright blocks.
+
+## Data Deletion UX
+
+The Settings page exposes a destructive "Delete all my data" action. It should:
+
+1. Explain that Git repositories on disk are not modified.
+2. Ask for confirmation before invoking the backend.
+3. Clear SQLite app data through the Tauri command.
+4. Clear `localStorage` keys starting with `gitpulse.`.
+5. Reset selected workspace/repository UI state.
+
+This keeps the local-first promise visible and gives users a recoverable mental
+model: GitPulse data can be reset without touching their repositories.
+
+## Public Docs And Landing
+
+The public landing page should mirror the app, not invent a separate brand.
+It should show:
+
+- The same navy/orange palette as the app.
+- A product preview that resembles the desktop dashboard.
+- Direct links to README, architecture, design, release process, changelog,
+  contributing, security, and public releases.
+- The unsigned macOS install command:
+
+```bash
+xattr -cr /Applications/GitPulse.app
+```
+
+Release docs must explain that current macOS builds are unsigned and that the
+command clears macOS quarantine after the app is moved to `/Applications`.

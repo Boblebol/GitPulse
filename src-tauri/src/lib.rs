@@ -69,6 +69,8 @@ pub fn run() {
             commands::repos::pause_scan,
             commands::repos::resume_scan,
             commands::repos::get_scan_status,
+            // local data
+            commands::data::delete_all_data,
             // developers
             commands::developers::list_developers,
             commands::developers::list_unreviewed_developers,

@@ -121,6 +121,15 @@ This document describes how to publish GitPulse desktop releases from the
 
 - For tagged builds, open GitHub Releases and select the matching tag, for
   example `v0.2.0-rc.2`. Desktop bundles are attached to that release.
+- macOS builds are currently unsigned. After dragging `GitPulse.app` to
+  `/Applications`, run this once in Terminal before opening the app:
+
+  ```bash
+  xattr -cr /Applications/GitPulse.app
+  ```
+
+  The command removes the quarantine attribute added by macOS to downloaded
+  unsigned apps. It does not change GitPulse data or scanned repositories.
 - For untagged `master` builds, open GitHub Actions, select `Desktop Build`,
   open the latest successful run, and download the `gitpulse-linux`,
   `gitpulse-macos`, or `gitpulse-windows` artifact.
@@ -139,6 +148,9 @@ creating a release:
 
 - If Linux builds fail before compiling Rust, check the installed Tauri system
   dependencies in the workflow.
+- If macOS Gatekeeper refuses to open a downloaded release candidate, make sure
+  the app was moved to `/Applications`, then rerun
+  `xattr -cr /Applications/GitPulse.app`.
 - If macOS or Windows signing is required later, add signing credentials as
   repository secrets and keep unsigned local builds available for contributors.
 - If the release workflow creates a draft with missing assets, rerun only the

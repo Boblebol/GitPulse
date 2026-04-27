@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#222a3d"/>
+      <stop offset="1" stop-color="#0b1326"/>
+    </linearGradient>
+    <linearGradient id="ball" x1="240" y1="166" x2="792" y2="858" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffb599"/>
+      <stop offset="0.52" stop-color="#f26522"/>
+      <stop offset="1" stop-color="#b93d12"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="matrix(318 356 -356 318 344 234)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff1e9" stop-opacity="0.58"/>
+      <stop offset="0.42" stop-color="#fff1e9" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#fff1e9" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="116" y="116" width="792" height="836" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="36" stdDeviation="42" flood-color="#050913" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <circle cx="512" cy="500" r="366" fill="#050913" opacity="0.32" filter="url(#shadow)"/>
+  <circle cx="512" cy="492" r="356" fill="url(#ball)"/>
+  <circle cx="512" cy="492" r="356" fill="url(#shine)"/>
+  <path d="M512 142c-84 123-126 240-126 350s42 227 126 350M512 142c84 123 126 240 126 350s-42 227-126 350" fill="none" stroke="#5b1f10" stroke-width="32" stroke-linecap="round" opacity="0.72"/>
+  <path d="M178 410c95 43 206 65 334 65s239-22 334-65M178 574c95-43 206-65 334-65s239 22 334 65" fill="none" stroke="#5b1f10" stroke-width="30" stroke-linecap="round" opacity="0.68"/>
+  <path d="M314 324l154 154m0 0v160m0-160h190" fill="none" stroke="#fff7f2" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="314" cy="324" r="70" fill="#fff7f2"/>
+  <circle cx="468" cy="478" r="70" fill="#fff7f2"/>
+  <circle cx="468" cy="638" r="70" fill="#fff7f2"/>
+  <circle cx="658" cy="478" r="70" fill="#fff7f2"/>
+  <circle cx="314" cy="324" r="27" fill="#f26522"/>
+  <circle cx="468" cy="478" r="27" fill="#f26522"/>
+  <circle cx="468" cy="638" r="27" fill="#f26522"/>
+  <circle cx="658" cy="478" r="27" fill="#f26522"/>
+</svg>

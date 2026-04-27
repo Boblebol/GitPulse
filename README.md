@@ -102,6 +102,19 @@ to a public GitHub Release or prerelease.
 Download published desktop builds from GitHub Releases:
 https://github.com/Boblebol/GitPulse/releases
 
+### Unsigned macOS builds
+
+Current macOS release-candidate bundles are not code-signed. After dragging
+`GitPulse.app` to `/Applications`, clear the quarantine attribute once:
+
+```bash
+xattr -cr /Applications/GitPulse.app
+```
+
+This removes the Gatekeeper quarantine marker added to downloaded apps. It does
+not modify GitPulse data or any repository you scan. After running it, open
+GitPulse again from Finder, Spotlight, or Launchpad.
+
 Desktop bundles are also built on every `master` push by the `Desktop Build`
 workflow and can be downloaded from the workflow run artifacts for 14 days.
 

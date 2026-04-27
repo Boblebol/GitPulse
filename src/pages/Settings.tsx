@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import {
   useWorkspaces,
@@ -19,6 +20,16 @@ import type { Repo, ScanProgress } from "../types";
 
 const DEFAULT_FORMULA =
   "(commits * 10) + (insertions * 0.5) - (deletions * 0.3) + (files_touched * 2) + (streak_bonus * 3)";
+
+function clearGitPulseLocalStorage() {
+  if (typeof window === "undefined") return;
+
+  for (const key of Object.keys(window.localStorage)) {
+    if (key.startsWith("gitpulse.")) {
+      window.localStorage.removeItem(key);
+    }
+  }
+}
 
 function formatScanStatus(status: ScanProgress["status"]) {
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -66,6 +77,7 @@ function RepoBranchPicker({
 
 export default function Settings() {
   const { workspaceId, setWorkspaceId, setRepoId, scanningRepoId, setScanningRepoId, syncStatus, setSyncStatus, scanProgressByRepo, addNotification } = useAppContext();
+  const queryClient = useQueryClient();
   const { data: workspaces = [] } = useWorkspaces();
   const { data: repos = [] } = useRepos(workspaceId);
   const createWs = useCreateWorkspace();
@@ -75,6 +87,9 @@ export default function Settings() {
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();
   const updateFormula = useUpdateFormula();
+  const deleteAllData = useMutation<void, string>({
+    mutationFn: () => invoke("delete_all_data"),
+  });
 
   const [wsName, setWsName] = useState("");
   const [repoPath, setRepoPath] = useState("");
@@ -84,6 +99,33 @@ export default function Settings() {
 
   // For listing branches when adding a new repo
   const [branches, setBranches] = useState<string[]>([]);
+
+  const handleDeleteAllData = () => {
+    const confirmed = window.confirm(
+      "This permanently deletes all local GitPulse data: workspaces, repositories, scans, aliases, reports, watchlists, dismissed achievements, and demo state. Your Git repositories are not modified.",
+    );
+    if (!confirmed) return;
+
+    deleteAllData.mutate(undefined, {
+      onSuccess: () => {
+        clearGitPulseLocalStorage();
+        queryClient.clear();
+        setWorkspaceId(null);
+        setRepoId(null);
+        setScanningRepoId(null);
+        setSyncStatus("");
+        setRepoPath("");
+        setRepoName("");
+        setBranches([]);
+        setSelectedBranch(undefined);
+        setFormula(DEFAULT_FORMULA);
+        addNotification("All local GitPulse data was deleted.", "success");
+      },
+      onError: (error) => {
+        addNotification(`Could not delete data: ${error}`, "error");
+      },
+    });
+  };
 
   // Load branches when path changes
   useEffect(() => {
@@ -413,6 +455,33 @@ export default function Settings() {
         )}
         {updateFormula.isError && (
           <p className="text-xs text-error">{updateFormula.error}</p>
+        )}
+      </section>
+
+      {/* ── Local Data ─────────────────────────────────────────────────── */}
+      <section className="space-y-3 rounded-lg bg-error-container/20 p-4 ring-1 ring-error/20">
+        <h2
+          className="text-sm uppercase tracking-widest text-error"
+          style={{ fontFamily: "Inter, sans-serif" }}
+        >
+          Danger Zone
+        </h2>
+        <p className="text-xs text-on-surface-variant leading-relaxed">
+          Delete the local SQLite database content and GitPulse browser storage. Source repositories on disk are not touched.
+        </p>
+        <button
+          disabled={deleteAllData.isPending || scanningRepoId !== null}
+          onClick={handleDeleteAllData}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-error text-on-primary transition-opacity disabled:opacity-40"
+        >
+          <Trash2 size={14} />
+          {deleteAllData.isPending ? "Deleting..." : "Delete all my data"}
+        </button>
+        {scanningRepoId !== null && (
+          <p className="text-xs text-error">Stop the current scan before deleting all data.</p>
+        )}
+        {deleteAllData.isError && (
+          <p className="text-xs text-error">{deleteAllData.error}</p>
         )}
       </section>
     </div>
