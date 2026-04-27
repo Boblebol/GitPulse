@@ -7,7 +7,10 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Changed
+
+- GitHub Actions workflows now use Node 24-compatible action versions to avoid
+  Node 20 deprecation warnings.
 
 ## [0.2.0-rc.5] - 2026-04-26
 
