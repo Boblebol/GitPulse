@@ -47,6 +47,30 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+:focus-visible {
+  outline: 2px solid #ffb599;
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  transform: translateY(-150%);
+  border-radius: 8px;
+  background: #ffb599;
+  color: #1a0a00;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: transform 120ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* ── Scrollbar (arena-dark themed) ───────────────────────────────────── */
 ::-webkit-scrollbar             { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track       { background: #0b1326; }

@@ -22,6 +22,7 @@ import { useWorkspaces } from "../hooks/useRepos";
 import { useRepos } from "../hooks/useRepos";
 import { useAppContext } from "../context/AppContext";
 import AnalysisScopeToggle from "./AnalysisScopeToggle";
+import HelpTooltip from "./HelpTooltip";
 
 const NAV = [
   { to: "/",            label: "Dashboard",    Icon: LayoutDashboard },
@@ -72,7 +73,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 space-y-0.5">
+      <nav aria-label="Primary navigation" className="flex-1 px-3 space-y-0.5">
         {NAV.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
@@ -115,8 +116,14 @@ export default function Sidebar() {
 
         {/* Workspace select */}
         <div>
-          <label className="text-xs text-on-surface-variant mb-1 block">Workspace</label>
+          <div className="mb-1 flex items-center gap-1.5">
+            <label className="text-xs text-on-surface-variant">Workspace</label>
+            <HelpTooltip label="What is a workspace?">
+              A workspace groups related repositories so product-level pages can compare them together.
+            </HelpTooltip>
+          </div>
           <select
+            aria-label="Workspace"
             value={workspaceId ?? ""}
             onChange={(e) => {
               setWorkspaceId(e.target.value || null);
@@ -133,8 +140,14 @@ export default function Sidebar() {
 
         {/* Repo select */}
         <div>
-          <label className="text-xs text-on-surface-variant mb-1 block">Repository</label>
+          <div className="mb-1 flex items-center gap-1.5">
+            <label className="text-xs text-on-surface-variant">Repository</label>
+            <HelpTooltip label="What is the selected repository?">
+              This controls repo-level pages and scan actions. Choose Demo if you want to explore without adding a repo.
+            </HelpTooltip>
+          </div>
           <select
+            aria-label="Repository"
             value={repoId ?? ""}
             onChange={(e) => setRepoId(e.target.value || null)}
             disabled={!workspaceId}
@@ -148,7 +161,12 @@ export default function Sidebar() {
         </div>
 
         <div>
-          <label className="text-xs text-on-surface-variant mb-1 block">Stats Scope</label>
+          <div className="mb-1 flex items-center gap-1.5">
+            <label className="text-xs text-on-surface-variant">Stats Scope</label>
+            <HelpTooltip label="What is stats scope?">
+              Repo scope shows one repository. Workspace scope combines all repositories in the selected workspace.
+            </HelpTooltip>
+          </div>
           <AnalysisScopeToggle
             mode={analysisScopeMode}
             onChange={setAnalysisScopeMode}

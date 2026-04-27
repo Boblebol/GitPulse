@@ -9,6 +9,8 @@ export function ToastContainer() {
       {notifications.map((notif) => (
         <div
           key={notif.id}
+          role={notif.type === "success" ? "status" : "alert"}
+          aria-live={notif.type === "success" ? "polite" : "assertive"}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg animate-in slide-in-from-top-2 ${
             notif.type === "success"
               ? "bg-tertiary text-on-tertiary"
@@ -22,6 +24,8 @@ export function ToastContainer() {
           )}
           <span className="text-sm font-medium flex-1">{notif.message}</span>
           <button
+            type="button"
+            aria-label={`Dismiss ${notif.type} notification`}
             onClick={() => removeNotification(notif.id)}
             className="opacity-70 hover:opacity-100 transition-opacity"
           >

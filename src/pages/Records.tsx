@@ -81,6 +81,7 @@ export default function Records() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Records period type"
             value={period.periodType}
             onChange={(event) => updatePeriodType(event.target.value as PeriodType)}
             className="rounded-full bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
@@ -92,6 +93,7 @@ export default function Records() {
             <option value="all_time">All Time</option>
           </select>
           <input
+            aria-label="Records period key"
             value={period.periodKey}
             onChange={(event) =>
               setPeriod((current) => ({

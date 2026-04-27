@@ -76,6 +76,7 @@ export default function Awards() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Awards period type"
             value={period.periodType}
             onChange={(event) => updatePeriodType(event.target.value as PeriodType)}
             className="rounded-full bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
@@ -87,6 +88,7 @@ export default function Awards() {
             <option value="all_time">All Time</option>
           </select>
           <input
+            aria-label="Awards period key"
             value={period.periodKey}
             onChange={(event) =>
               setPeriod((current) => ({

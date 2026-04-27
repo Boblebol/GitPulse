@@ -17,6 +17,9 @@ import { useUpdateFormula } from "../hooks/useStats";
 import { useAppContext } from "../context/AppContext";
 import { Plus, Trash2, RefreshCw, FlaskConical, ChevronDown, Pause, Play } from "lucide-react";
 import type { Repo, ScanProgress } from "../types";
+import FieldHint from "../components/FieldHint";
+import HelpTooltip from "../components/HelpTooltip";
+import PageHelp from "../components/PageHelp";
 
 const DEFAULT_FORMULA =
   "(commits * 10) + (insertions * 0.5) - (deletions * 0.3) + (files_touched * 2) + (streak_bonus * 3)";
@@ -51,6 +54,7 @@ function RepoBranchPicker({
   return (
     <div className="relative w-auto max-w-[150px] shrink-0">
       <select
+        aria-label={`Active branch for ${repo.name}`}
         value={repo.active_branch}
         disabled={setRepoBranch.isPending}
         onChange={(e) => {
@@ -175,6 +179,15 @@ export default function Settings() {
         </p>
       </div>
 
+      <PageHelp
+        title="Setup flow"
+        items={[
+          "Create a workspace first; it is the container for one product, team, or repo family.",
+          "Add a local Git repository with an absolute path, choose a branch, then run Sync.",
+          "Formula and data deletion are advanced controls; they do not modify your Git repositories.",
+        ]}
+      />
+
       {/* ── Workspaces ─────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <h2
@@ -185,20 +198,27 @@ export default function Settings() {
         </h2>
 
         {/* Create */}
-        <div className="flex gap-2">
-          <input
-            value={wsName}
-            onChange={(e) => setWsName(e.target.value)}
-            placeholder="Workspace name…"
-            className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50"
-          />
-          <button
-            disabled={!wsName.trim() || createWs.isPending}
-            onClick={() => { createWs.mutate(wsName.trim()); setWsName(""); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40"
-          >
-            <Plus size={14} /> Create
-          </button>
+        <div>
+          <div className="flex gap-2">
+            <input
+              aria-label="Workspace name"
+              aria-describedby="workspace-name-hint"
+              value={wsName}
+              onChange={(e) => setWsName(e.target.value)}
+              placeholder="Workspace name…"
+              className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50"
+            />
+            <button
+              disabled={!wsName.trim() || createWs.isPending}
+              onClick={() => { createWs.mutate(wsName.trim()); setWsName(""); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40"
+            >
+              <Plus size={14} /> Create
+            </button>
+          </div>
+          <FieldHint id="workspace-name-hint">
+            Use a product, team, or client name. You can add multiple repositories inside it.
+          </FieldHint>
         </div>
 
         {/* List */}
@@ -216,6 +236,7 @@ export default function Settings() {
             >
               <span className="text-sm text-on-surface font-medium">{ws.name}</span>
               <button
+                aria-label={`Delete workspace ${ws.name}`}
                 onClick={(e) => { e.stopPropagation(); deleteWs.mutate(ws.id); }}
                 className="text-on-surface-variant hover:text-error transition-colors"
               >
@@ -237,14 +258,19 @@ export default function Settings() {
 
         {workspaceId && (
           <>
-            <div className="flex gap-2">
+            <div className="space-y-1">
+              <div className="flex gap-2">
               <input
+                aria-label="Repository path"
+                aria-describedby="repo-path-hint"
                 value={repoPath}
                 onChange={(e) => setRepoPath(e.target.value)}
                 placeholder="/absolute/path/to/repo"
                 className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50 font-mono"
               />
               <input
+                aria-label="Repository display name"
+                aria-describedby="repo-name-hint"
                 value={repoName}
                 onChange={(e) => setRepoName(e.target.value)}
                 placeholder="Display name"
@@ -253,6 +279,8 @@ export default function Settings() {
               {branches.length > 0 && (
                 <div className="relative w-auto max-w-xs">
                   <select
+                    aria-label="Initial branch"
+                    aria-describedby="repo-branch-hint"
                     value={selectedBranch || ""}
                     onChange={(e) => setSelectedBranch(e.target.value)}
                     className="w-full appearance-none bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-8 truncate"
@@ -283,6 +311,18 @@ export default function Settings() {
               >
                 <Plus size={14} /> Add
               </button>
+              </div>
+              <FieldHint id="repo-path-hint">
+                Use an absolute local path, for example <code className="text-primary">/Users/alex/project</code>. GitPulse reads Git history only.
+              </FieldHint>
+              <FieldHint id="repo-name-hint">
+                Display name is the short name shown in selectors and reports.
+              </FieldHint>
+              {branches.length > 0 && (
+                <FieldHint id="repo-branch-hint">
+                  Pick the branch whose history should drive the first scan.
+                </FieldHint>
+              )}
             </div>
             {addRepo.isError && (
               <p className="text-xs text-error">{addRepo.error}</p>
@@ -422,18 +462,27 @@ export default function Settings() {
           Player Score Formula
         </h2>
         <p className="text-xs text-on-surface-variant">
-          Variables: <code className="text-primary">commits</code>,{" "}
+          Variables{" "}
+          <HelpTooltip label="How does the formula work?">
+            The formula recalculates player score from stored scan data. It changes analytics only, not your Git history.
+          </HelpTooltip>
+          : <code className="text-primary">commits</code>,{" "}
           <code className="text-primary">insertions</code>,{" "}
           <code className="text-primary">deletions</code>,{" "}
           <code className="text-primary">files_touched</code>,{" "}
           <code className="text-primary">streak_bonus</code> (1 when streak ≥ 3)
         </p>
         <textarea
+          aria-label="Player score formula"
+          aria-describedby="formula-hint"
           value={formula}
           onChange={(e) => setFormula(e.target.value)}
           rows={3}
           className="w-full bg-surface-container text-on-surface text-sm font-mono rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 resize-none"
         />
+        <FieldHint id="formula-hint">
+          Keep the listed variable names exactly. Apply Formula recalculates scores from local GitPulse data.
+        </FieldHint>
         <div className="flex items-center gap-3">
           <button
             disabled={!formula.trim() || updateFormula.isPending}

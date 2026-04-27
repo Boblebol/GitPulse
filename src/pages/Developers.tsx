@@ -203,12 +203,14 @@ export default function Developers() {
                     {editing === d.developer_id && (
                       <div className="flex gap-1">
                         <button
+                          aria-label={`Save name for ${d.developer_name}`}
                           onClick={(e) => { e.stopPropagation(); commitEdit(d.developer_id); }}
                           className="text-tertiary hover:text-tertiary/80"
                         >
                           <Check size={14} />
                         </button>
                         <button
+                          aria-label={`Cancel editing ${d.developer_name}`}
                           onClick={(e) => { e.stopPropagation(); setEditing(null); }}
                           className="text-error hover:text-error/80"
                         >
@@ -237,6 +239,7 @@ export default function Developers() {
 
                   {/* Edit button */}
                   <button
+                    aria-label={`Rename ${d.developer_name}`}
                     onClick={(e) => { e.stopPropagation(); startEdit(d.developer_id, d.developer_name); }}
                     className="text-on-surface-variant hover:text-on-surface transition-colors justify-self-end"
                   >

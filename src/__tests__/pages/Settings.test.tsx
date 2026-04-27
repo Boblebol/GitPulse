@@ -61,4 +61,16 @@ describe("Settings", () => {
     expect(window.localStorage.getItem("gitpulse.watchlist.items")).toBeNull();
     expect(window.localStorage.getItem("other.product.key")).toBe("kept");
   });
+
+  it("explains the setup flow and repository path field", async () => {
+    renderSettings();
+
+    expect(screen.getByText("Setup flow")).toBeInTheDocument();
+    expect(
+      screen.getByText(/create a workspace first/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Workspace name")).toHaveAccessibleDescription(
+      /add multiple repositories/i,
+    );
+  });
 });

@@ -69,7 +69,7 @@ describe("Dashboard demo mode", () => {
     renderDashboard();
 
     expect(
-      screen.getByText("Select a workspace and repository in the sidebar to get started."),
+      screen.getByText(/select a workspace and repository.*try the demo first/i),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Enable Demo" }));
@@ -94,7 +94,7 @@ describe("Dashboard demo mode", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Select a workspace and repository in the sidebar to get started."),
+        screen.getByText(/select a workspace and repository.*try the demo first/i),
       ).toBeInTheDocument();
     });
     expect(screen.queryAllByText("Ari Maintainer")).toHaveLength(0);

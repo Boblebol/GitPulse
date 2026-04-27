@@ -45,6 +45,7 @@ describe("ToastContainer", () => {
     await waitFor(() => {
       expect(screen.getByText("Test message")).toBeInTheDocument();
     });
+    expect(screen.getByRole("status")).toHaveTextContent("Test message");
   });
 
   it("displays error notification", async () => {
@@ -61,6 +62,7 @@ describe("ToastContainer", () => {
     await waitFor(() => {
       expect(screen.getByText("Error message")).toBeInTheDocument();
     });
+    expect(screen.getByRole("alert")).toHaveTextContent("Error message");
   });
 
   it("auto-dismisses notifications after 3 seconds", async () => {

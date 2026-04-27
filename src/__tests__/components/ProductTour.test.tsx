@@ -42,7 +42,7 @@ describe("ProductTour", () => {
     expect(
       screen.getByRole("dialog", { name: "GitPulse product tour" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("See value in minutes")).toBeInTheDocument();
+    expect(screen.getByText("Try the demo first")).toBeInTheDocument();
     expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
   });
 
@@ -55,8 +55,33 @@ describe("ProductTour", () => {
     expect(screen.getByText("Step 2 of 6")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByText("See value in minutes")).toBeInTheDocument();
+    expect(screen.getByText("Try the demo first")).toBeInTheDocument();
     expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
+  });
+
+  it("focuses the close button when opened", async () => {
+    renderProductTour();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Close tour" })).toHaveFocus();
+    });
+  });
+
+  it("closes when Escape is pressed", async () => {
+    const user = userEvent.setup();
+    renderProductTour();
+
+    expect(
+      screen.getByRole("dialog", { name: "GitPulse product tour" }),
+    ).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "GitPulse product tour" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("dismisses and persists the tour when finished", async () => {
@@ -67,7 +92,7 @@ describe("ProductTour", () => {
       await user.click(screen.getByRole("button", { name: "Next" }));
     }
 
-    expect(screen.getByText("Make GitPulse a habit")).toBeInTheDocument();
+    expect(screen.getByText("Clean aliases before trusting metrics")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Finish tour" }));
 
     await waitFor(() => {

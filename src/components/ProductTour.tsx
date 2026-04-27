@@ -1,60 +1,76 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
 
 const STEPS = [
   {
-    title: "See value in minutes",
+    title: "Try the demo first",
     body:
-      "GitPulse stays local, scans Git history into SQLite, and turns repository activity into readable product and code-health signals.",
-    accent: "Local-first repo intelligence",
+      "Use Demo Mode when you are just exploring. It shows the Dashboard shape without touching your repositories or local SQLite data.",
+    accent: "Fastest first look",
   },
   {
     title: "Create a workspace",
     body:
-      "Group related repositories so Dashboard, Seasons, Awards, Records, and Hall of Fame can tell the story of a product area instead of one repo only.",
+      "A workspace groups related repositories. Use it for one product area, team, or codebase family so workspace-level stats stay meaningful.",
     accent: "Start in Settings",
   },
   {
-    title: "Add a repo and branch",
+    title: "Add a repository and branch",
     body:
-      "Pick the active branch you want to analyze. GitPulse reads Git data and keeps branch cursors so future scans can be incremental.",
-    accent: "No working tree mutation",
+      "Add a local Git repository with an absolute path, then choose the branch you want to analyze. GitPulse reads history and does not mutate your working tree.",
+    accent: "Local Git only",
   },
   {
-    title: "Scan and resume safely",
+    title: "Run one scan at a time",
     body:
-      "Run a scan, pause it if needed, and resume from persisted progress. Large repos keep moving without blocking the rest of the app.",
-    accent: "Progress is durable",
+      "Start with one scan and let it finish. You can pause or resume, but merges and alias edits are locked while indexing to keep the local database consistent.",
+    accent: "Safer indexing",
   },
   {
     title: "Read the dashboard first",
     body:
-      "Use the Dashboard for the first aha moment: activity timeline, top files, developer context, and the fastest route to hotspots.",
+      "Use the Dashboard as the first checkpoint: scan status, activity timeline, top contributors, top files, and quick links into deeper pages.",
     accent: "Your daily overview",
   },
   {
-    title: "Make GitPulse a habit",
+    title: "Clean aliases before trusting metrics",
     body:
-      "Come back for Code Health, volatility, coupling, Seasons, Awards, Records, and Hall of Fame. The next milestones add recaps, insights, watchlists, and exports.",
-    accent: "Retention loop",
+      "If one person committed with several names or emails, review Aliases before comparing contributors. Clean identities make every metric easier to trust.",
+    accent: "Better contributor data",
   },
 ];
 
 export default function ProductTour() {
   const { isProductTourOpen, dismissProductTour } = useAppContext();
   const [stepIndex, setStepIndex] = useState(0);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const finishTour = () => {
+    setStepIndex(0);
+    dismissProductTour();
+  };
+
+  useEffect(() => {
+    if (!isProductTourOpen) return;
+
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        finishTour();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isProductTourOpen]);
 
   if (!isProductTourOpen) return null;
 
   const step = STEPS[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === STEPS.length - 1;
-
-  const finishTour = () => {
-    setStepIndex(0);
-    dismissProductTour();
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
@@ -78,9 +94,10 @@ export default function ProductTour() {
             </h2>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={finishTour}
-            aria-label="Skip tour"
+            aria-label="Close tour"
             className="rounded-full bg-surface-container-high p-2 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface"
           >
             <X size={16} />

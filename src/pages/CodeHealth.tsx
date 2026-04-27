@@ -1,6 +1,9 @@
 import { useState } from "react";
 import StatCard from "../components/StatCard";
 import { useAppContext } from "../context/AppContext";
+import FieldHint from "../components/FieldHint";
+import HelpTooltip from "../components/HelpTooltip";
+import PageHelp from "../components/PageHelp";
 import {
   useActivitySignalStats,
   useDeveloperFocusStats,
@@ -121,6 +124,7 @@ export default function CodeHealth() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
+            aria-label="Code health period type"
             value={period.periodType}
             onChange={(event) => updatePeriodType(event.target.value as PeriodType)}
             className="rounded-full bg-surface-container-high px-3 py-2 text-sm text-on-surface outline-none"
@@ -132,6 +136,8 @@ export default function CodeHealth() {
             <option value="all_time">All Time</option>
           </select>
           <input
+            aria-label="Code health period key"
+            aria-describedby="code-health-period-key-hint"
             value={period.periodKey}
             onChange={(event) =>
               setPeriod((current) => ({
@@ -144,19 +150,31 @@ export default function CodeHealth() {
         </div>
       </div>
 
+      <PageHelp
+        title="Code health guide"
+        items={[
+          "Hotspots are files with high activity and risk signals; review them before broad refactors.",
+          "Silo risk means one owner dominates a file, so knowledge may be concentrated.",
+          "Review risk, volatility, and coupling are directional signals; use them to decide where to inspect next.",
+        ]}
+      />
+      <FieldHint id="code-health-period-key-hint">
+        Use formats like <code className="text-primary">2026-04</code>, <code className="text-primary">2026-Q2</code>, <code className="text-primary">2026</code>, or <code className="text-primary">all</code> depending on the period type.
+      </FieldHint>
+
       <div className="grid grid-cols-4 gap-3">
-          <StatCard label="Files" value={files.length} accent />
-          <StatCard label="Hotspots" value={hotspotFiles} />
-          <StatCard label="Silo Risk" value={siloFiles} />
-          <StatCard
-            label="Directory Risk"
-            value={formatScore(averageDirectoryHealth)}
-          />
-          <StatCard label="Review Risk" value={formatScore(topRiskScore)} />
-          <StatCard label="Volatility" value={formatScore(topVolatilityScore)} />
-          <StatCard label="Couplings" value={couplingRows.length} />
-          <StatCard label="Signal" value={topActivitySignal} />
-        </div>
+        <StatCard label="Files" value={files.length} accent />
+        <StatCard label="Hotspots" value={hotspotFiles} />
+        <StatCard label="Silo Risk" value={siloFiles} />
+        <StatCard
+          label="Directory Risk"
+          value={formatScore(averageDirectoryHealth)}
+        />
+        <StatCard label="Review Risk" value={formatScore(topRiskScore)} />
+        <StatCard label="Volatility" value={formatScore(topVolatilityScore)} />
+        <StatCard label="Couplings" value={couplingRows.length} />
+        <StatCard label="Signal" value={topActivitySignal} />
+      </div>
 
       <section>
         <h2
@@ -164,6 +182,9 @@ export default function CodeHealth() {
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           File Hotspots
+          <HelpTooltip label="What is a hotspot?" className="ml-1.5">
+            A hotspot is a file with enough activity, churn, ownership, or coupling signals to deserve attention.
+          </HelpTooltip>
         </h2>
         {loadingFiles ? (
           <p className="text-on-surface-variant text-sm">Loading...</p>
@@ -229,6 +250,9 @@ export default function CodeHealth() {
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           Directory Health
+          <HelpTooltip label="What is directory risk?" className="ml-1.5">
+            Directory risk summarizes file hotspots, churn, and silo signals under the same folder.
+          </HelpTooltip>
         </h2>
         {loading ? (
           <p className="text-on-surface-variant text-sm">Loading...</p>
@@ -289,6 +313,9 @@ export default function CodeHealth() {
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           Developer Focus
+          <HelpTooltip label="What is developer focus?" className="ml-1.5">
+            Focus compares how concentrated a developer's work is versus frequent switching across files and directories.
+          </HelpTooltip>
         </h2>
         {loadingFocus ? (
           <p className="text-on-surface-variant text-sm">Loading...</p>
@@ -355,6 +382,9 @@ export default function CodeHealth() {
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Review Risk Proxy
+            <HelpTooltip label="What is review risk?" className="ml-1.5">
+              Review risk flags commits that touched many files or directories and may need closer review.
+            </HelpTooltip>
           </h2>
           {loadingRisk ? (
             <p className="text-on-surface-variant text-sm">Loading...</p>
@@ -400,6 +430,9 @@ export default function CodeHealth() {
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Activity Signals
+            <HelpTooltip label="What are activity signals?" className="ml-1.5">
+              Activity signals estimate whether a period looks more feature-heavy, refactor-heavy, or cleanup-heavy.
+            </HelpTooltip>
           </h2>
           {loadingSignals ? (
             <p className="text-on-surface-variant text-sm">Loading...</p>
@@ -458,6 +491,9 @@ export default function CodeHealth() {
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Code Volatility
+            <HelpTooltip label="What is volatility?" className="ml-1.5">
+              Volatility highlights files that keep changing across multiple weeks, especially with repeated churn.
+            </HelpTooltip>
           </h2>
           {loadingVolatility ? (
             <p className="text-on-surface-variant text-sm">Loading...</p>
@@ -515,6 +551,9 @@ export default function CodeHealth() {
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Coupling Graph
+            <HelpTooltip label="What is coupling?" className="ml-1.5">
+              Coupling shows file pairs that often change in the same commits. Strong pairs may hide design dependencies.
+            </HelpTooltip>
           </h2>
           {loadingCoupling ? (
             <p className="text-on-surface-variant text-sm">Loading...</p>

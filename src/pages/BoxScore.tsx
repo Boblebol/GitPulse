@@ -53,6 +53,7 @@ export default function BoxScore() {
         <div className="flex flex-wrap gap-2 items-center justify-end">
           <TimeRangePicker value={timeRange} onChange={setTimeRange} />
           <input
+            aria-label="Box score date"
             type="date"
             value={selectedDate}
             max={today()}
@@ -60,6 +61,7 @@ export default function BoxScore() {
             className="bg-surface-container text-on-surface text-sm rounded-lg px-3 py-1.5 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40"
           />
           <select
+            aria-label="Box score developer"
             value={selectedDevId ?? ""}
             onChange={(e) => setSelectedDevId(e.target.value || null)}
             className="bg-surface-container text-on-surface text-sm rounded-lg px-3 py-1.5 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40"

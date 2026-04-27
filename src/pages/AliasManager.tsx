@@ -8,6 +8,8 @@ import {
 import { useAppContext } from "../context/AppContext";
 import { GitMerge, AlertCircle, ChevronDown, ChevronUp, MoveRight } from "lucide-react";
 import type { Alias } from "../types";
+import HelpTooltip from "../components/HelpTooltip";
+import PageHelp from "../components/PageHelp";
 
 export default function AliasManager() {
   const { data: unreviewed = [] } = useUnreviewedDevelopers();
@@ -58,6 +60,15 @@ export default function AliasManager() {
         </p>
       </div>
 
+      <PageHelp
+        title="Alias review"
+        items={[
+          "Use Move for one email/name pair that belongs under another developer.",
+          "Use Merge when two developer records are the same person.",
+          "Alias edits are locked during scans so analytics and local SQLite data stay consistent.",
+        ]}
+      />
+
       {/* Unreviewed banner */}
       {unreviewed.length > 0 && (
         <div className="flex items-center gap-3 bg-surface-container-high rounded-lg px-4 py-3">
@@ -74,6 +85,9 @@ export default function AliasManager() {
           <AlertCircle size={16} className="text-error shrink-0" />
           <p className="text-sm text-on-surface">
             Alias changes are locked while a scan is running. Pause it or wait for it to finish before merging identities.
+            <HelpTooltip label="Why are aliases locked during scans?" className="ml-1.5">
+              Scans write commits, files, and developer facts. Waiting avoids partial identity changes while indexing is active.
+            </HelpTooltip>
           </p>
         </div>
       )}
@@ -166,7 +180,12 @@ export default function AliasManager() {
 
                   {/* Merge action */}
                   <div className="flex items-center gap-2 pt-1">
-                    <span className="text-xs text-on-surface-variant">Merge into →</span>
+                    <span className="text-xs text-on-surface-variant">
+                      Merge into →
+                      <HelpTooltip label="What does merge into do?" className="ml-1">
+                        The selected target keeps the combined identity. The source developer is folded into it.
+                      </HelpTooltip>
+                    </span>
                     <select
                       aria-label={`Merge ${dev.name} into`}
                       value={mergeTarget[dev.id] ?? ""}

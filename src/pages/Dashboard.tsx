@@ -5,6 +5,8 @@ import { useInsights } from "../hooks/useInsights";
 import ActivityChart from "../components/ActivityChart";
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
+import HelpTooltip from "../components/HelpTooltip";
+import PageHelp from "../components/PageHelp";
 import {
   DEMO_ACTIVITY_TIMELINE,
   DEMO_DEVELOPER_STATS,
@@ -174,6 +176,7 @@ export default function Dashboard() {
           <TimeRangePicker value={timeRange} onChange={setTimeRange} />
           {repoId && (
             <button
+              aria-label="Sync selected repository"
               onClick={handleSyncRepo}
               disabled={syncDisabled}
               className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-50 transition-opacity"
@@ -185,9 +188,20 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <PageHelp
+        title="Dashboard basics"
+        items={[
+          "Start here after the first scan: it summarizes activity, contributors, and files for the selected scope.",
+          "Use the time range to switch between historical context and recent movement.",
+          "Sync reads local Git history into GitPulse; it does not modify your repository.",
+        ]}
+      />
+
       {/* Scan progress */}
       {scanProgress && (
         <div
+          role="status"
+          aria-live="polite"
           className={[
             "rounded-lg px-4 py-3 text-sm",
             scanStatusTone,
@@ -281,7 +295,7 @@ export default function Dashboard() {
       {/* No repo selected */}
       {!hasAnalysisTarget && (
         <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">
-          <p>Select a workspace and repository in the sidebar to get started.</p>
+          <p>Select a workspace and repository in the sidebar to analyze your data, or try the demo first.</p>
           <button
             type="button"
             onClick={enableDemoMode}
@@ -351,6 +365,9 @@ export default function Dashboard() {
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               All-Time Totals
+              <HelpTooltip label="What are all-time totals?" className="ml-1.5">
+                Totals add up commits, insertions, and deletions for the selected scope and time range.
+              </HelpTooltip>
             </h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Commits"    value={fmt(totals.commits)}    accent />
@@ -366,6 +383,9 @@ export default function Dashboard() {
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
                 Activity Timeline
+                <HelpTooltip label="What is the activity timeline?" className="ml-1.5">
+                  This chart shows commit volume by date for the selected repository or workspace.
+                </HelpTooltip>
               </h2>
               <div className="flex gap-3 text-xs text-on-surface-variant">
                 <span>{fmt(activityTotals.commits)} commits</span>
@@ -373,7 +393,11 @@ export default function Dashboard() {
                 <span className="text-error">-{fmt(activityTotals.deletions)}</span>
               </div>
             </div>
-            <div className="bg-surface-container-high rounded-lg px-4 pt-4 pb-2">
+            <div
+              className="bg-surface-container-high rounded-lg px-4 pt-4 pb-2"
+              role="img"
+              aria-label={`Activity timeline with ${fmt(activityTotals.commits)} commits, ${fmt(activityTotals.insertions)} insertions, and ${fmt(activityTotals.deletions)} deletions.`}
+            >
               <ActivityChart
                 data={activityData}
                 valueLabel="Commits"
@@ -442,6 +466,9 @@ export default function Dashboard() {
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               Top Contributors
+              <HelpTooltip label="How are top contributors ranked?" className="ml-1.5">
+                Contributors are sorted by commit volume in the selected scope. Clean aliases first if one person appears under multiple names.
+              </HelpTooltip>
             </h2>
             {loadingContributors ? (
               <div className="text-on-surface-variant text-sm">Loading…</div>
@@ -530,6 +557,9 @@ export default function Dashboard() {
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               Top Files
+              <HelpTooltip label="What are top files?" className="ml-1.5">
+                Files with the most commits in the selected repository and range. Co-touch shows how often a file changes with other files.
+              </HelpTooltip>
             </h2>
             {loadingTopFiles ? (
               <div className="text-on-surface-variant text-sm">Loading…</div>

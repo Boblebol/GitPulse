@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TimeRange, TimeRangeMode } from "../types";
 import { createTimeRange, shiftTimeRange } from "../utils/timeRange";
+import HelpTooltip from "./HelpTooltip";
 
 interface Props {
   value: TimeRange;
@@ -53,6 +54,9 @@ export default function TimeRangePicker({ value, onChange }: Props) {
           </option>
         ))}
       </select>
+      <HelpTooltip label="How does the time range work?">
+        It filters activity by commit date. All time is best for setup; recent ranges are better for trends.
+      </HelpTooltip>
 
       {canNavigate && (
         <div className="flex items-center rounded-lg bg-surface-container p-0.5">

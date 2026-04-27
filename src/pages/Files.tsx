@@ -11,6 +11,8 @@ import { useAppContext } from "../context/AppContext";
 import { useFileStats, useDirectoryStats } from "../hooks/useStats";
 import StatCard from "../components/StatCard";
 import TimeRangePicker from "../components/TimeRangePicker";
+import HelpTooltip from "../components/HelpTooltip";
+import PageHelp from "../components/PageHelp";
 import { FileCode2 } from "lucide-react";
 import { timeRangeToQuery } from "../utils/timeRange";
 
@@ -88,6 +90,15 @@ export default function Files() {
         <TimeRangePicker value={timeRange} onChange={setTimeRange} />
       </div>
 
+      <PageHelp
+        title="File metrics"
+        items={[
+          "Churn highlights files with a lot of recent line movement.",
+          "Co-touch shows files that often change together and may be coupled.",
+          "Use this page to find files worth reviewing before they become hotspots.",
+        ]}
+      />
+
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Tracked Files" value={files.length}               accent />
@@ -105,6 +116,9 @@ export default function Files() {
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Top 10 Files by Churn Score
+            <HelpTooltip label="What is churn score?" className="ml-1.5">
+              Churn combines insertions and deletions, with recent movement weighted higher than old movement.
+            </HelpTooltip>
           </h2>
           <div className="bg-surface-container-high rounded-lg px-4 pt-4 pb-2">
             <ResponsiveContainer width="100%" height={220}>
@@ -167,9 +181,12 @@ export default function Files() {
         <h2
           className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
           style={{ fontFamily: "Inter, sans-serif" }}
-        >
-          Most Touched Files
-        </h2>
+          >
+            Most Touched Files
+            <HelpTooltip label="How should I read most touched files?" className="ml-1.5">
+              Start with commit count, then compare churn and co-touch to find files that are both busy and connected.
+            </HelpTooltip>
+          </h2>
         {loadingFiles ? (
           <p className="text-on-surface-variant text-sm">Loading…</p>
         ) : files.length === 0 ? (
@@ -232,14 +249,12 @@ export default function Files() {
                   </span>
                   <span
                     className="hidden sm:block text-xs text-on-surface-variant w-14 text-right shrink-0"
-                    title="Co-touch score"
                     style={{ fontFamily: "Public Sans, sans-serif" }}
                   >
                     Co {formatScore(f.co_touch_score)}
                   </span>
                   <span
                     className="text-xs text-primary w-16 text-right shrink-0"
-                    title="Churn score"
                     style={{ fontFamily: "Public Sans, sans-serif" }}
                   >
                     ⚡{formatScore(f.churn_score)}
@@ -256,9 +271,12 @@ export default function Files() {
         <h2
           className="text-sm uppercase tracking-widest text-on-surface-variant mb-3"
           style={{ fontFamily: "Inter, sans-serif" }}
-        >
-          Directories
-        </h2>
+          >
+            Directories
+            <HelpTooltip label="How are directories counted?" className="ml-1.5">
+              Directory metrics are recursive: a file in src/a also contributes to src.
+            </HelpTooltip>
+          </h2>
         {loadingDirs ? (
           <p className="text-on-surface-variant text-sm">Loading…</p>
         ) : (

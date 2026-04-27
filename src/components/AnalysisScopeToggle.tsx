@@ -23,6 +23,7 @@ export default function AnalysisScopeToggle({ mode, onChange, disabled }: Props)
         "grid grid-cols-2 rounded-lg bg-surface-container p-0.5",
         disabled ? "opacity-40" : "",
       ].join(" ")}
+      role="group"
       aria-label="Analysis scope"
     >
       {OPTIONS.map(({ mode: optionMode, label, Icon }) => {
