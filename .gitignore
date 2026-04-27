@@ -14,6 +14,7 @@ site-dist
 dist-ssr
 coverage
 .gitpulse-worktree/
+docs/superpowers/
 *.local
 
 # Editor directories and files
