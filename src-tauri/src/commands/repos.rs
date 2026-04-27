@@ -382,6 +382,8 @@ async fn inner_trigger_scan_with_progress(
             .await?
             .ok_or_else(|| RepoError::RepoNotFound(repo_id.to_string()))?;
 
+    crate::models::scan::ensure_no_running_scan(pool).await?;
+
     let result = if let Some(callback) = progress_callback {
         crate::git::scan_repo_with_progress(
             pool,
@@ -646,6 +648,48 @@ mod tests {
         let pool = test_pool().await;
         let err = inner_trigger_scan(&pool, "no-such-id").await.unwrap_err();
         assert!(err.to_string().contains("repo not found"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn trigger_scan_rejects_when_a_scan_is_already_running() {
+        let pool = test_pool().await;
+        let first_tmp = TempDir::new().unwrap();
+        let second_tmp = TempDir::new().unwrap();
+        let first_repo = init_repo(first_tmp.path());
+        let second_repo = init_repo(second_tmp.path());
+        commit_at(&first_repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        commit_at(&second_repo, "c1", "Bob", "b@x.com", &[("b.txt", "1")], D1);
+
+        let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
+        let first = inner_add_repo(
+            &pool,
+            ws.id.clone(),
+            first_tmp.path().to_str().unwrap().into(),
+            "first".into(),
+            None,
+        )
+        .await
+        .unwrap();
+        let second = inner_add_repo(
+            &pool,
+            ws.id,
+            second_tmp.path().to_str().unwrap().into(),
+            "second".into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        crate::models::scan::create_scan_run(&pool, &first.id, "main", "head-a")
+            .await
+            .unwrap();
+
+        let err = inner_trigger_scan(&pool, &second.id).await.unwrap_err();
+
+        assert!(
+            err.to_string().contains("scan already running"),
+            "unexpected error: {err}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -5,6 +5,7 @@ import {
   useMergeDevelopers,
   useReassignAlias,
 } from "../hooks/useDevelopers";
+import { useAppContext } from "../context/AppContext";
 import { GitMerge, AlertCircle, ChevronDown, ChevronUp, MoveRight } from "lucide-react";
 import type { Alias } from "../types";
 
@@ -13,10 +14,12 @@ export default function AliasManager() {
   const { data: allDevs = [] } = useDevelopers();
   const merge = useMergeDevelopers();
   const reassign = useReassignAlias();
+  const { scanningRepoId } = useAppContext();
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Record<string, string>>({});
   const [aliasTarget, setAliasTarget] = useState<Record<string, string>>({});
+  const aliasChangesLocked = scanningRepoId !== null;
 
   function aliasLabel(alias: Alias) {
     return `${alias.git_name} <${alias.git_email}>`;
@@ -62,6 +65,15 @@ export default function AliasManager() {
           <p className="text-sm text-on-surface">
             <span className="font-semibold text-primary">{unreviewed.length}</span>{" "}
             auto-created developer{unreviewed.length > 1 ? "s" : ""} waiting for review.
+          </p>
+        </div>
+      )}
+
+      {aliasChangesLocked && (
+        <div className="flex items-center gap-3 rounded-lg bg-error-container/20 px-4 py-3">
+          <AlertCircle size={16} className="text-error shrink-0" />
+          <p className="text-sm text-on-surface">
+            Alias changes are locked while a scan is running. Pause it or wait for it to finish before merging identities.
           </p>
         </div>
       )}
@@ -123,13 +135,14 @@ export default function AliasManager() {
                           <select
                             aria-label={`Move ${aliasLabel(a)} to`}
                             value={aliasTarget[a.id] ?? ""}
+                            disabled={aliasChangesLocked}
                             onChange={(e) =>
                               setAliasTarget((prev) => ({
                                 ...prev,
                                 [a.id]: e.target.value,
                               }))
                             }
-                            className="min-w-0 max-w-[180px] bg-surface-container-high text-on-surface text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary/40"
+                            className="min-w-0 max-w-[180px] bg-surface-container-high text-on-surface text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-40"
                           >
                             <option value="">Move to...</option>
                             {allDevs
@@ -140,7 +153,7 @@ export default function AliasManager() {
                           </select>
                           <button
                             aria-label={`Move alias ${aliasLabel(a)}`}
-                            disabled={!aliasTarget[a.id] || reassign.isPending}
+                            disabled={!aliasTarget[a.id] || reassign.isPending || aliasChangesLocked}
                             onClick={() => doReassign(a.id)}
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-primary gradient-primary disabled:opacity-40 transition-opacity"
                           >
@@ -155,11 +168,13 @@ export default function AliasManager() {
                   <div className="flex items-center gap-2 pt-1">
                     <span className="text-xs text-on-surface-variant">Merge into →</span>
                     <select
+                      aria-label={`Merge ${dev.name} into`}
                       value={mergeTarget[dev.id] ?? ""}
+                      disabled={aliasChangesLocked}
                       onChange={(e) =>
                         setMergeTarget((prev) => ({ ...prev, [dev.id]: e.target.value }))
                       }
-                      className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary/40"
+                      className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-40"
                     >
                       <option value="">— choose target —</option>
                       {allDevs
@@ -169,7 +184,7 @@ export default function AliasManager() {
                         ))}
                     </select>
                     <button
-                      disabled={!mergeTarget[dev.id] || merge.isPending}
+                      disabled={!mergeTarget[dev.id] || merge.isPending || aliasChangesLocked}
                       onClick={() => doMerge(dev.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40 transition-opacity"
                     >

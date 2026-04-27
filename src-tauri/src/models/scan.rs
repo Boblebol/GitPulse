@@ -96,6 +96,10 @@ pub enum ScanRunError {
     Db(#[from] sqlx::Error),
     #[error("invalid scan run status in database: {0}")]
     InvalidStatus(String),
+    #[error(
+        "scan already running for repo {repo_id}; pause it or wait for it to finish before starting another scan or merging aliases"
+    )]
+    ScanAlreadyRunning { repo_id: String },
 }
 
 /// Create a new running scan run for a repository and branch.
@@ -105,10 +109,12 @@ pub async fn create_scan_run(
     branch: &str,
     target_head_sha: &str,
 ) -> Result<ScanRun, ScanRunError> {
+    ensure_no_running_scan(pool).await?;
+
     let now = Utc::now().to_rfc3339();
     let id = Uuid::new_v4().to_string();
 
-    sqlx::query(
+    let insert = sqlx::query(
         "INSERT INTO scan_runs
          (id, repo_id, branch, target_head_sha, cursor_sha, status,
           commits_indexed, files_processed, error_message,
@@ -123,11 +129,47 @@ pub async fn create_scan_run(
     .bind(&now)
     .bind(&now)
     .execute(pool)
-    .await?;
+    .await;
+
+    if let Err(err) = insert {
+        if is_single_running_scan_violation(&err) {
+            return Err(running_scan_error(pool).await);
+        }
+        return Err(ScanRunError::Db(err));
+    }
 
     fetch_scan_run(pool, &id)
         .await?
         .ok_or_else(|| ScanRunError::InvalidStatus("missing inserted scan run".to_string()))
+}
+
+/// Fetch the currently running scan, if any. GitPulse intentionally allows only
+/// one active scan because scans and aggregate rebuilds are write-heavy.
+pub async fn fetch_running_scan_run(pool: &SqlitePool) -> Result<Option<ScanRun>, ScanRunError> {
+    let row: Option<ScanRunRow> = sqlx::query_as(
+        "SELECT id, repo_id, branch, target_head_sha, cursor_sha, status,
+                commits_indexed, files_processed, error_message,
+                started_at, updated_at, completed_at
+         FROM scan_runs
+         WHERE status = ?
+         ORDER BY started_at DESC, updated_at DESC, id DESC
+         LIMIT 1",
+    )
+    .bind(ScanRunStatus::Running.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    row.map(ScanRun::try_from).transpose()
+}
+
+pub async fn ensure_no_running_scan(pool: &SqlitePool) -> Result<(), ScanRunError> {
+    if let Some(run) = fetch_running_scan_run(pool).await? {
+        return Err(ScanRunError::ScanAlreadyRunning {
+            repo_id: run.repo_id,
+        });
+    }
+
+    Ok(())
 }
 
 /// Fetch a scan run by id.
@@ -147,6 +189,26 @@ pub async fn fetch_scan_run(
     .await?;
 
     row.map(ScanRun::try_from).transpose()
+}
+
+fn is_single_running_scan_violation(err: &sqlx::Error) -> bool {
+    err.as_database_error().is_some_and(|db_err| {
+        let message = db_err.message();
+        message.contains("idx_scan_runs_single_running")
+            || message.contains("UNIQUE constraint failed: scan_runs.status")
+    })
+}
+
+async fn running_scan_error(pool: &SqlitePool) -> ScanRunError {
+    match fetch_running_scan_run(pool).await {
+        Ok(Some(run)) => ScanRunError::ScanAlreadyRunning {
+            repo_id: run.repo_id,
+        },
+        Ok(None) => ScanRunError::ScanAlreadyRunning {
+            repo_id: "unknown".to_string(),
+        },
+        Err(err) => err,
+    }
 }
 
 /// Fetch the latest scan run for a repository.
@@ -295,6 +357,28 @@ mod tests {
         assert_eq!(run.files_processed, 0);
         assert_eq!(run.error_message, None);
         assert_eq!(run.completed_at, None);
+    }
+
+    #[tokio::test]
+    async fn create_scan_run_rejects_a_second_running_scan() {
+        let pool = test_pool().await;
+        let tmp_a = TempDir::new().unwrap();
+        let tmp_b = TempDir::new().unwrap();
+        let (_, first_repo_id) = seed_workspace_and_repo(&pool, tmp_a.path()).await;
+        let (_, second_repo_id) = seed_workspace_and_repo(&pool, tmp_b.path()).await;
+
+        create_scan_run(&pool, &first_repo_id, "main", "head-a")
+            .await
+            .unwrap();
+
+        let err = create_scan_run(&pool, &second_repo_id, "main", "head-b")
+            .await
+            .unwrap_err();
+
+        assert!(
+            err.to_string().contains("scan already running"),
+            "unexpected error: {err}"
+        );
     }
 
     #[tokio::test]

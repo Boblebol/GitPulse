@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { AppProvider, useAppContext } from "../../context/AppContext";
 import AliasManager from "../../pages/AliasManager";
 import type { DeveloperWithAliases } from "../../types";
 
@@ -44,7 +45,26 @@ const developers: DeveloperWithAliases[] = [
   },
 ];
 
-function renderWithClient(children: ReactNode) {
+function ScanningStateSeed({
+  repoId,
+  children,
+}: {
+  repoId: string | null;
+  children: ReactNode;
+}) {
+  const { setScanningRepoId } = useAppContext();
+
+  useEffect(() => {
+    setScanningRepoId(repoId);
+  }, [repoId, setScanningRepoId]);
+
+  return <>{children}</>;
+}
+
+function renderWithClient(
+  children: ReactNode,
+  options: { scanningRepoId?: string | null } = {}
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -53,7 +73,13 @@ function renderWithClient(children: ReactNode) {
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <AppProvider>
+        <ScanningStateSeed repoId={options.scanningRepoId ?? null}>
+          {children}
+        </ScanningStateSeed>
+      </AppProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -96,5 +122,26 @@ describe("AliasManager", () => {
         targetDeveloperId: "dev2",
       });
     });
+  });
+
+  it("disables merge and alias moves while a scan is running", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<AliasManager />, { scanningRepoId: "repo1" });
+
+    await user.click(await screen.findByRole("button", { name: /Alice/i }));
+
+    expect(
+      screen.getByText(/alias changes are locked while a scan is running/i)
+    ).toBeInTheDocument();
+
+    expect(screen.getByLabelText("Move Alice <alice@example.com> to")).toBeDisabled();
+    expect(screen.getByLabelText("Merge Alice into")).toBeDisabled();
+
+    expect(
+      screen.getByRole("button", {
+        name: "Move alias Alice <alice@example.com>",
+      })
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Merge$/i })).toBeDisabled();
   });
 });

@@ -9,6 +9,8 @@ use crate::AppState;
 pub(crate) enum DevError {
     #[error("{0}")]
     Alias(#[from] AliasError),
+    #[error("scan run error: {0}")]
+    ScanRun(#[from] crate::models::scan::ScanRunError),
     #[error("aggregation error: {0}")]
     Agg(#[from] crate::aggregation::AggError),
 }
@@ -64,6 +66,7 @@ pub(crate) async fn inner_merge_developers(
     source_id: String,
     target_id: String,
 ) -> Result<(), DevError> {
+    crate::models::scan::ensure_no_running_scan(pool).await?;
     alias::merge_developers(pool, &source_id, &target_id).await?;
     crate::aggregation::recalculate_all(pool).await?;
     Ok(())
@@ -86,6 +89,7 @@ pub(crate) async fn inner_reassign_alias(
     alias_id: String,
     target_developer_id: String,
 ) -> Result<(), DevError> {
+    crate::models::scan::ensure_no_running_scan(pool).await?;
     alias::reassign_alias(pool, &alias_id, &target_developer_id).await?;
     crate::aggregation::recalculate_all(pool).await?;
     Ok(())
@@ -221,6 +225,38 @@ mod tests {
         assert_eq!(total, 2);
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn merge_developers_rejects_while_scan_is_running() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        commit_at(&repo, "c2", "Bob", "b@x.com", &[("b.txt", "2")], D2);
+
+        let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
+
+        let devs = alias::list_developers(&pool).await.unwrap();
+        let alice = devs.iter().find(|d| d.developer.name == "Alice").unwrap();
+        let bob = devs.iter().find(|d| d.developer.name == "Bob").unwrap();
+
+        crate::models::scan::create_scan_run(&pool, &rid, "main", "head-running")
+            .await
+            .unwrap();
+
+        let err =
+            inner_merge_developers(&pool, bob.developer.id.clone(), alice.developer.id.clone())
+                .await
+                .unwrap_err();
+
+        assert!(
+            err.to_string().contains("scan already running"),
+            "unexpected error: {err}"
+        );
+    }
+
     // ── reassign alias ────────────────────────────────────────────────────────
 
     #[tokio::test(flavor = "multi_thread")]
@@ -256,5 +292,37 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(total, 2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn reassign_alias_rejects_while_scan_is_running() {
+        let pool = test_pool().await;
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        commit_at(&repo, "c1", "Alice", "a@x.com", &[("a.txt", "1")], D1);
+        commit_at(&repo, "c2", "Bob", "b@x.com", &[("b.txt", "2")], D2);
+
+        let (_, rid) = seed_workspace_and_repo(&pool, tmp.path()).await;
+        crate::git::scan_repo(&pool, &rid, tmp.path(), "main")
+            .await
+            .unwrap();
+
+        let devs = alias::list_developers(&pool).await.unwrap();
+        let alice = devs.iter().find(|d| d.developer.name == "Alice").unwrap();
+        let bob = devs.iter().find(|d| d.developer.name == "Bob").unwrap();
+        let bob_alias_id = bob.aliases[0].id.clone();
+
+        crate::models::scan::create_scan_run(&pool, &rid, "main", "head-running")
+            .await
+            .unwrap();
+
+        let err = inner_reassign_alias(&pool, bob_alias_id, alice.developer.id.clone())
+            .await
+            .unwrap_err();
+
+        assert!(
+            err.to_string().contains("scan already running"),
+            "unexpected error: {err}"
+        );
     }
 }
