@@ -99,6 +99,9 @@ named `vX.Y.Z` or release-candidate tags such as `vX.Y.Z-rc.N`. The release
 workflow builds Linux, macOS, and Windows desktop artifacts, then attaches them
 to a public GitHub Release or prerelease.
 
+Download published desktop builds from GitHub Releases:
+https://github.com/Boblebol/GitPulse/releases
+
 Desktop bundles are also built on every `master` push by the `Desktop Build`
 workflow and can be downloaded from the workflow run artifacts for 14 days.
 

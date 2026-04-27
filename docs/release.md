@@ -14,6 +14,18 @@ This document describes how to publish GitPulse desktop releases from the
 - The `Desktop Build` workflow also runs on every `master` push and uploads
   temporary downloadable artifacts for validation.
 
+## Public Surfaces
+
+- GitHub Pages documentation is published from the `master` branch workflow:
+  `https://Boblebol.github.io/GitPulse/`.
+- Desktop downloads are published from tag workflows:
+  `https://github.com/Boblebol/GitPulse/releases`.
+- Keep the GitHub default branch, workflow branch filters, README badges, and
+  release docs aligned. The current public release branch is `master`.
+- Pages must be configured in GitHub repository settings to deploy from GitHub
+  Actions. If `actions/configure-pages` cannot create the Pages site, enable
+  Pages once from repository settings, then rerun the workflow.
+
 ## Prepare A Release
 
 1. Make sure the working tree is clean:
@@ -45,8 +57,8 @@ This document describes how to publish GitPulse desktop releases from the
 
    The Tauri app version in `src-tauri/tauri.conf.json` must remain compatible
    with Windows MSI packaging. For release candidates, use a numeric-only
-   prerelease identifier such as `0.2.0-4` while the Git tag remains
-   `v0.2.0-rc.4`.
+   prerelease identifier such as `0.2.0-5` while the Git tag remains
+   `v0.2.0-rc.5`.
 
 4. Run local verification:
 
@@ -101,9 +113,9 @@ This document describes how to publish GitPulse desktop releases from the
 
 3. Wait for the `Release` workflow to finish.
 
-4. Open the GitHub Release or prerelease, review generated assets, and refine
-   release notes from `CHANGELOG.md` if needed. Tags containing `-rc.` are
-   marked as prereleases by the workflow.
+4. Open the GitHub Release or prerelease, confirm the Linux, macOS, and Windows
+   assets are attached, and refine release notes from `CHANGELOG.md` if needed.
+   Tags containing `-rc.` are marked as prereleases by the workflow.
 
 ## Find Downloads
 
@@ -131,3 +143,6 @@ creating a release:
   repository secrets and keep unsigned local builds available for contributors.
 - If the release workflow creates a draft with missing assets, rerun only the
   failed matrix job before publishing the release.
+- If GitHub Pages fails during `Configure Pages` with `Resource not accessible
+  by integration`, check that the repository default branch is `master` and that
+  Pages is enabled with `GitHub Actions` as the source.

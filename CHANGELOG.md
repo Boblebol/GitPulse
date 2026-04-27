@@ -9,6 +9,15 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 No unreleased changes yet.
 
+## [0.2.0-rc.5] - 2026-04-26
+
+### Changed
+
+- Release publish job now passes the repository explicitly to `gh release edit`
+  so it can publish the draft created by matrix build jobs.
+- Public release docs and the GitHub Pages site now point users to published
+  release downloads instead of implying a manual draft-publish step.
+
 ## [0.2.0-rc.4] - 2026-04-26
 
 ### Changed
@@ -77,7 +86,8 @@ No unreleased changes yet.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.4...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.5...HEAD
+[0.2.0-rc.5]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.4...v0.2.0-rc.5
 [0.2.0-rc.4]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.3...v0.2.0-rc.4
 [0.2.0-rc.3]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.2...v0.2.0-rc.3
 [0.2.0-rc.2]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.1...v0.2.0-rc.2

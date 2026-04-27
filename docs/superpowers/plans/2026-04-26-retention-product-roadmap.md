@@ -26,7 +26,8 @@
 | `v0.2.0-rc.1` | `V4-008` | Open Source Release Candidate | Shipped in `bc34aec` | OSS hygiene, RC versions, changelog, and prerelease workflow. |
 | `v0.2.0-rc.2` | `V4-009` | Public Downloads Release Candidate | Superseded by `v0.2.0-rc.3` | Published prereleases and desktop artifacts from CI. |
 | `v0.2.0-rc.3` | `V4-010` | Pages And Windows RC Fix | Superseded by `v0.2.0-rc.4` | Pages auto-enablement and MSI-compatible RC app version. |
-| `v0.2.0-rc.4` | `V4-011` | Release Asset Publishing Fix | Prepared for tag | Upload assets to a draft release before publishing. |
+| `v0.2.0-rc.4` | `V4-011` | Release Asset Publishing Fix | Superseded by `v0.2.0-rc.5` | Upload assets to a draft release before publishing. |
+| `v0.2.0-rc.5` | `V4-012` | Release Publish Context Fix | In progress | Publish draft releases with explicit repo context. |
 
 Release rule: each version must be independently useful, tested, and documented before tagging. Avoid bundling half-built later milestones into an earlier release.
 
@@ -360,6 +361,30 @@ visible.
 - The prerelease is visible only after assets are attached.
 
 **Commit:** `ci: publish release after asset upload`
+
+### Milestone 12: Release Publish Context Fix
+
+**Ticket:** `V4-012`
+
+**Publishable version:** `v0.2.0-rc.5`
+
+**Status:** In progress.
+
+**Outcome:** the final publish job can find and publish the draft release
+created by the matrix build jobs.
+
+**Scope:**
+
+- Pass the repository explicitly to `gh release edit`.
+- Keep the draft-first asset upload flow.
+- Keep the Tauri app version MSI-compatible with `0.2.0-5`.
+
+**Acceptance:**
+
+- Linux, macOS, and Windows assets upload.
+- The final publish job marks the draft prerelease visible.
+
+**Commit:** `ci: publish release with repo context`
 
 ---
 

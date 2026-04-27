@@ -133,7 +133,7 @@ const tutorials = [
   },
   {
     title: "Publish a release",
-    steps: ["Update versions and CHANGELOG.md.", "Commit release prep on master.", "Push a vX.Y.Z tag.", "Review and publish the generated GitHub Release draft."],
+    steps: ["Update versions and CHANGELOG.md.", "Commit release prep on master.", "Push a vX.Y.Z tag.", "Confirm the published GitHub Release has Linux, macOS, and Windows assets."],
   },
 ];
 
@@ -312,10 +312,14 @@ function App() {
           <p className="eyebrow">Releases</p>
           <h2>Tag-driven desktop publishing.</h2>
           <p>
-            A `vX.Y.Z` tag starts the release workflow. GitHub Actions builds Linux, macOS, and Windows bundles and attaches them to a draft release for review.
+            A `vX.Y.Z` tag starts the release workflow. GitHub Actions builds Linux, macOS, and Windows bundles, attaches them to the matching GitHub Release, and publishes release candidates as prereleases.
           </p>
           <div className="hero-actions compact">
-            <a className="button primary" href={`${repoUrl}/blob/master/docs/release.md`}>
+            <a className="button primary" href={`${repoUrl}/releases`}>
+              <MonitorDown size={18} />
+              Download releases
+            </a>
+            <a className="button secondary" href={`${repoUrl}/blob/master/docs/release.md`}>
               <Rocket size={18} />
               Release process
             </a>
@@ -327,7 +331,7 @@ function App() {
         </div>
         <div className="release-panel">
           <div><ShieldCheck size={20} /><strong>CI gate</strong><span>Tests, build, clippy, and site build.</span></div>
-          <div><Rocket size={20} /><strong>Release draft</strong><span>Created from tag builds with artifacts.</span></div>
+          <div><Rocket size={20} /><strong>Published downloads</strong><span>Tag builds attach installable desktop bundles.</span></div>
           <div><BookOpen size={20} /><strong>Changelog</strong><span>Manual notes stay readable and public.</span></div>
         </div>
       </section>
