@@ -7,6 +7,15 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-27
+
+### Changed
+
+- Promotes the `0.2.0` release-candidate line to a stable release.
+- Stable desktop bundles now include the onboarding, accessibility, scan
+  locking, data reset, icon, release automation, and open-source readiness work
+  documented in the `0.2.0-rc.1` through `0.2.0-rc.9` entries below.
+
 ## [0.2.0-rc.9] - 2026-04-27
 
 ### Added
@@ -144,7 +153,8 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.9...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.9...v0.2.0
 [0.2.0-rc.9]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.8...v0.2.0-rc.9
 [0.2.0-rc.8]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.7...v0.2.0-rc.8
 [0.2.0-rc.7]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.6...v0.2.0-rc.7
