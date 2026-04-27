@@ -7,6 +7,28 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+## [0.2.0-rc.9] - 2026-04-27
+
+### Added
+
+- Beginner-friendly onboarding help across the app with page summaries, field
+  hints, and keyboard-accessible tooltips for key metrics and workflows.
+- A refreshed product tour focused on first-run setup, demo data, scan
+  expectations, dashboard reading, and alias cleanup.
+- Internal accessibility and onboarding guidance in
+  `docs/accessibility-onboarding.md`.
+
+### Changed
+
+- Dashboard, Settings, Files, Code Health, Aliases, and sidebar controls now
+  explain ambiguous terms without overloading the main UI.
+
+### Fixed
+
+- Core accessibility affordances now include a skip link, visible focus styles,
+  live-region toast semantics, chart summaries, and clearer ARIA labels for
+  icon-only controls.
+
 ## [0.2.0-rc.8] - 2026-04-27
 
 ### Fixed
@@ -122,7 +144,8 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.8...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.9...HEAD
+[0.2.0-rc.9]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.8...v0.2.0-rc.9
 [0.2.0-rc.8]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.7...v0.2.0-rc.8
 [0.2.0-rc.7]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.6...v0.2.0-rc.7
 [0.2.0-rc.6]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.5...v0.2.0-rc.6
