@@ -1,6 +1,6 @@
 [package]
 name = "gitpulse"
-version = "0.2.0"
+version = "0.2.1"
 description = "GitPulse — local Git repository analyser"
 authors = ["Boblebol"]
 license = "MIT"
@@ -45,7 +45,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 evalexpr = "11"
 
 # Git
-git2 = "0.19"
+git2 = "0.20.4"
 
 [dev-dependencies]
 tempfile = "3"

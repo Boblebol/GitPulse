@@ -7,6 +7,23 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-27
+
+### Security
+
+- Enabled Dependabot security updates, secret scanning, and secret scanning
+  push protection for the public GitHub repository.
+- Updated `postcss` to a patched `8.5.x` release.
+- Updated `git2` to `0.20.4`, including the patched `libgit2-sys` dependency.
+
+### Changed
+
+- Tightened `master` branch protection with required pull request review,
+  stale-review dismissal, required conversation resolution, and admin
+  enforcement.
+- Removed internal `docs/superpowers` planning notes from the public repository
+  and ignored that path going forward.
+
 ## [0.2.0] - 2026-04-27
 
 ### Changed
@@ -153,7 +170,8 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Boblebol/GitPulse/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.9...v0.2.0
 [0.2.0-rc.9]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.8...v0.2.0-rc.9
 [0.2.0-rc.8]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.7...v0.2.0-rc.8
