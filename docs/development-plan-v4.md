@@ -21,7 +21,7 @@ Cargo, Jest, and GitHub Dependabot.
 ## Implementation Status
 
 - [x] V4-T1 Resolve Dependabot security alerts.
-- [ ] V4-T2 Add manual aggregate rebuild action.
+- [x] V4-T2 Add manual aggregate rebuild action.
 - [ ] V4-T3 Add CSV, PDF, and PPTX exports from Reports only.
 - [ ] V4-T4 Move `.gitpulse-worktree/` outside analyzed repositories.
 - [x] Remove temporary branch `chore/dependency-updates-site-footer`.
@@ -94,7 +94,7 @@ release.
 
 ## Ticket V4-T2: Manual Aggregate Rebuild Action
 
-**Status:** Planned.
+**Status:** Done.
 
 **Purpose:** give users a safe way to rebuild derived stats for old local
 databases after aggregation logic changes.

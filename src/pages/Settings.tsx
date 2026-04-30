@@ -24,6 +24,35 @@ import PageHelp from "../components/PageHelp";
 const DEFAULT_FORMULA =
   "(commits * 10) + (insertions * 0.5) - (deletions * 0.3) + (files_touched * 2) + (streak_bonus * 3)";
 
+const ANALYTICS_QUERY_KEYS = [
+  "stats",
+  "daily_stats",
+  "file_stats",
+  "directory_stats",
+  "activity_timeline",
+  "leaderboard",
+  "box_score",
+  "insights",
+  "weekly_recap",
+  "period_leaderboard",
+  "period_awards",
+  "historical_records",
+  "hall_of_fame",
+  "file_health_stats",
+  "directory_health_stats",
+  "developer_focus_stats",
+  "review_risk_commits",
+  "activity_signal_stats",
+  "file_volatility_stats",
+  "file_coupling_graph",
+];
+
+type AggregateRebuildResult = {
+  started_at: string;
+  completed_at: string;
+  status: string;
+};
+
 function clearGitPulseLocalStorage() {
   if (typeof window === "undefined") return;
 
@@ -91,6 +120,9 @@ export default function Settings() {
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();
   const updateFormula = useUpdateFormula();
+  const rebuildAggregates = useMutation<AggregateRebuildResult, string>({
+    mutationFn: () => invoke<AggregateRebuildResult>("rebuild_aggregates"),
+  });
   const deleteAllData = useMutation<void, string>({
     mutationFn: () => invoke("delete_all_data"),
   });
@@ -127,6 +159,20 @@ export default function Settings() {
       },
       onError: (error) => {
         addNotification(`Could not delete data: ${error}`, "error");
+      },
+    });
+  };
+
+  const handleRebuildAggregates = () => {
+    rebuildAggregates.mutate(undefined, {
+      onSuccess: () => {
+        ANALYTICS_QUERY_KEYS.forEach((key) => {
+          queryClient.invalidateQueries({ queryKey: [key] });
+        });
+        addNotification("Analytics were rebuilt from local scan data.", "success");
+      },
+      onError: (error) => {
+        addNotification(`Could not rebuild analytics: ${error}`, "error");
       },
     });
   };
@@ -504,6 +550,36 @@ export default function Settings() {
         )}
         {updateFormula.isError && (
           <p className="text-xs text-error">{updateFormula.error}</p>
+        )}
+      </section>
+
+      {/* ── Maintenance ───────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <h2
+          className="text-sm uppercase tracking-widest text-on-surface-variant"
+          style={{ fontFamily: "Inter, sans-serif" }}
+        >
+          Maintenance
+        </h2>
+        <p className="text-xs text-on-surface-variant leading-relaxed">
+          Rebuild GitPulse analytics from local scan data. Source repositories on disk are not touched.
+        </p>
+        <button
+          disabled={rebuildAggregates.isPending || scanningRepoId !== null}
+          onClick={handleRebuildAggregates}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40"
+        >
+          <RefreshCw size={14} className={rebuildAggregates.isPending ? "animate-spin" : ""} />
+          {rebuildAggregates.isPending ? "Rebuilding..." : "Rebuild analytics"}
+        </button>
+        {scanningRepoId !== null && (
+          <p className="text-xs text-error">Stop the current scan before rebuilding analytics.</p>
+        )}
+        {rebuildAggregates.isSuccess && (
+          <p className="text-xs text-tertiary">Analytics rebuilt from local scan data.</p>
+        )}
+        {rebuildAggregates.isError && (
+          <p className="text-xs text-error">{rebuildAggregates.error}</p>
         )}
       </section>
 

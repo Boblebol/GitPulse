@@ -7,6 +7,11 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+### Added
+
+- Added a Settings maintenance action to rebuild analytics aggregates from local
+  scan data.
+
 ### Security
 
 - Updated compatible Rust dependencies and documented upstream Tauri/GTK

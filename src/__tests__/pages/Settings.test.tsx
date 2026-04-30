@@ -28,6 +28,13 @@ describe("Settings", () => {
     (invoke as jest.Mock).mockImplementation((command: string) => {
       if (command === "list_workspaces") return Promise.resolve([]);
       if (command === "delete_all_data") return Promise.resolve(undefined);
+      if (command === "rebuild_aggregates") {
+        return Promise.resolve({
+          started_at: "2026-04-30T10:00:00Z",
+          completed_at: "2026-04-30T10:00:01Z",
+          status: "completed",
+        });
+      }
       return Promise.resolve([]);
     });
   });
@@ -72,5 +79,17 @@ describe("Settings", () => {
     expect(screen.getByLabelText("Workspace name")).toHaveAccessibleDescription(
       /add multiple repositories/i,
     );
+  });
+
+  it("starts an aggregate rebuild from the maintenance action", async () => {
+    renderSettings();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /rebuild analytics/i }),
+    );
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("rebuild_aggregates");
+    });
   });
 });

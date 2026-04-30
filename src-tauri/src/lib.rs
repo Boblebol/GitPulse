@@ -71,6 +71,7 @@ pub fn run() {
             commands::repos::get_scan_status,
             // local data
             commands::data::delete_all_data,
+            commands::data::rebuild_aggregates,
             // developers
             commands::developers::list_developers,
             commands::developers::list_unreviewed_developers,
