@@ -42,7 +42,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
 # Formula evaluation (player score)
-evalexpr = "11"
+evalexpr = "13"
 
 # Git
 git2 = "0.20.4"
