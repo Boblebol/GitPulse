@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Copy, FileText } from "lucide-react";
+import { Copy, Download, FileText } from "lucide-react";
 import StatCard from "../components/StatCard";
 import { useAppContext } from "../context/AppContext";
 import {
@@ -12,6 +12,11 @@ import {
   buildCodeHealthMarkdown,
   buildDashboardMarkdown,
 } from "../utils/reports";
+import {
+  downloadReportFile,
+  type ReportExportFormat,
+  type ReportExportInput,
+} from "../utils/reportExports";
 import { createTimeRange, timeRangeToQuery } from "../utils/timeRange";
 
 type ReportType = "dashboard" | "code_health" | "weekly";
@@ -90,12 +95,47 @@ export default function Reports() {
     weeklyRecap?.markdown,
   ]);
 
+  const exportInput: ReportExportInput = useMemo(
+    () => ({
+      reportType,
+      reportLabel: reportTypeLabel(reportType),
+      scopeLabel,
+      fromDate: dateRange.fromDate,
+      toDate: dateRange.toDate,
+      markdown,
+      developers,
+      activity,
+      files,
+      weeklyRecap: weeklyRecap ?? null,
+    }),
+    [
+      activity,
+      dateRange.fromDate,
+      dateRange.toDate,
+      developers,
+      files,
+      markdown,
+      reportType,
+      scopeLabel,
+      weeklyRecap,
+    ],
+  );
+
   const copyMarkdown = async () => {
     try {
       await navigator.clipboard.writeText(markdown);
       addNotification("Report copied", "success");
     } catch {
       addNotification("Could not copy report", "error");
+    }
+  };
+
+  const exportReport = (format: ReportExportFormat) => {
+    try {
+      downloadReportFile(exportInput, format);
+      addNotification(`Report exported as ${format.toUpperCase()}`, "success");
+    } catch {
+      addNotification(`Could not export ${format.toUpperCase()} report`, "error");
     }
   };
 
@@ -110,18 +150,32 @@ export default function Reports() {
             Reports
           </h1>
           <p className="text-on-surface-variant text-sm mt-0.5">
-            Copy Markdown reports for retros, standups, OSS updates and handoffs.
+            Export reports for retros, standups, OSS updates and handoffs.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={copyMarkdown}
-          disabled={!hasAnalysisTarget}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Copy size={16} />
-          Copy Markdown
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={copyMarkdown}
+            disabled={!hasAnalysisTarget || loading}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Copy size={16} />
+            Copy Markdown
+          </button>
+          {(["csv", "pdf", "pptx"] as const).map((format) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => exportReport(format)}
+              disabled={!hasAnalysisTarget || loading}
+              className="inline-flex items-center gap-2 rounded-lg bg-surface-container-high px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download size={16} />
+              Export {format.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       {!hasAnalysisTarget && (
@@ -147,7 +201,7 @@ export default function Reports() {
                   className="text-sm uppercase tracking-widest text-on-surface-variant"
                   style={{ fontFamily: "Inter, sans-serif" }}
                 >
-                  Markdown Export
+                  Report Export
                 </h2>
               </div>
               <label className="text-xs text-on-surface-variant">

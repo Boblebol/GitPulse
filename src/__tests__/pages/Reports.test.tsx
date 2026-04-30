@@ -54,8 +54,9 @@ function renderWithProviders(children: ReactNode) {
 describe("Reports page", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    Object.assign(navigator, {
-      clipboard: {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
         writeText: jest.fn().mockResolvedValue(undefined),
       },
     });
@@ -176,5 +177,57 @@ describe("Reports page", () => {
     expect(
       (screen.getByLabelText("Report markdown") as HTMLTextAreaElement).value,
     ).toContain("# GitPulse Weekly Recap");
+  });
+
+  it("downloads CSV, PDF, and PPTX reports", async () => {
+    const user = userEvent.setup();
+    const downloads: string[] = [];
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const createObjectURL = jest.fn().mockReturnValue("blob:report");
+    const revokeObjectURL = jest.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+    const click = jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function clickDownload(this: HTMLAnchorElement) {
+        downloads.push(this.download);
+      });
+
+    renderWithProviders(
+      <>
+        <ScopeSetter />
+        <Reports />
+      </>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /export csv/i }));
+    await user.click(screen.getByRole("button", { name: /export pdf/i }));
+    await user.click(screen.getByRole("button", { name: /export pptx/i }));
+
+    expect(createObjectURL).toHaveBeenCalledTimes(3);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(3);
+    expect(click).toHaveBeenCalledTimes(3);
+    expect(downloads).toEqual([
+      "gitpulse-dashboard-2026-04-20-2026-04-26.csv",
+      "gitpulse-dashboard-2026-04-20-2026-04-26.pdf",
+      "gitpulse-dashboard-2026-04-20-2026-04-26.pptx",
+    ]);
+
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: originalCreateObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: originalRevokeObjectURL,
+    });
+    click.mockRestore();
   });
 });

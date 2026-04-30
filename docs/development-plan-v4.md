@@ -22,7 +22,7 @@ Cargo, Jest, and GitHub Dependabot.
 
 - [x] V4-T1 Resolve Dependabot security alerts.
 - [x] V4-T2 Add manual aggregate rebuild action.
-- [ ] V4-T3 Add CSV, PDF, and PPTX exports from Reports only.
+- [x] V4-T3 Add CSV, PDF, and PPTX exports from Reports only.
 - [ ] V4-T4 Move `.gitpulse-worktree/` outside analyzed repositories.
 - [x] Remove temporary branch `chore/dependency-updates-site-footer`.
 - [x] Leave local `AGENTS.md` untracked and untouched.
@@ -132,7 +132,7 @@ databases after aggregation logic changes.
 
 ## Ticket V4-T3: Reports CSV, PDF, And PPTX Exports
 
-**Status:** Planned.
+**Status:** Done.
 
 **Purpose:** expand the existing Reports page from copyable Markdown into
 downloadable formats for retros, handoffs, and release notes.

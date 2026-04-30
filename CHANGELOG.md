@@ -11,6 +11,8 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 - Added a Settings maintenance action to rebuild analytics aggregates from local
   scan data.
+- Added Reports CSV, PDF, and PPTX downloads alongside the existing Markdown
+  copy flow.
 
 ### Security
 
