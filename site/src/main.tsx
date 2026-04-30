@@ -345,7 +345,10 @@ function App() {
 
       <footer>
         <span>GitPulse</span>
-        <span>Local-first Git analytics for desktop teams.</span>
+        <span>
+          Local-first Git analytics by{" "}
+          <a href="https://alexandre-enouf.fr">Alexandre Enouf</a>.
+        </span>
       </footer>
     </main>
   );
