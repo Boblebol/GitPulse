@@ -7,6 +7,11 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+### Security
+
+- Updated compatible Rust dependencies and documented upstream Tauri/GTK
+  blockers for the remaining `rand` and `glib` Dependabot alerts.
+
 ## [0.2.2] - 2026-04-30
 
 ### Security

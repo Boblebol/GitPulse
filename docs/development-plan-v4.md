@@ -20,7 +20,7 @@ Cargo, Jest, and GitHub Dependabot.
 
 ## Implementation Status
 
-- [ ] V4-T1 Resolve Dependabot security alerts.
+- [x] V4-T1 Resolve Dependabot security alerts.
 - [ ] V4-T2 Add manual aggregate rebuild action.
 - [ ] V4-T3 Add CSV, PDF, and PPTX exports from Reports only.
 - [ ] V4-T4 Move `.gitpulse-worktree/` outside analyzed repositories.
@@ -44,7 +44,7 @@ Cargo, Jest, and GitHub Dependabot.
 
 ## Ticket V4-T1: Resolve Dependabot Security Alerts
 
-**Status:** Planned.
+**Status:** Done.
 
 **Purpose:** reduce or remove current GitHub Dependabot alerts before the next
 release.
@@ -66,6 +66,19 @@ release.
   and keep Dependabot enabled so a future upstream update can close it.
 - Avoid `[patch]` or forced transitive upgrades unless Cargo proves the full
   dependency graph accepts them and all backend checks pass.
+
+**Resolution Notes:**
+
+- Compatible Cargo updates were applied with `cargo update`.
+- `rand 0.7.3` remains in the graph through
+  `selectors 0.24.0 -> kuchikiki 0.8.8-speedreader -> tauri-utils 2.8.3`.
+  Cargo rejects `selectors 0.25.0` because `kuchikiki` requires
+  `selectors = "^0.24"`.
+- `glib 0.18.5` remains in the Linux Tauri stack through `gtk 0.18.2`.
+  Cargo rejects `glib 0.20.0` because `gtk` requires `glib = "^0.18"`.
+- Both remaining Dependabot alerts are therefore upstream dependency-chain
+  blockers in the current Tauri 2.10.x GTK stack, not direct GitPulse
+  dependencies.
 
 **Acceptance Criteria:**
 
@@ -208,4 +221,3 @@ final V4 integration commit, run:
 - `pnpm run site:build`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
-
