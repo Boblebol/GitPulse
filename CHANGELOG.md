@@ -7,6 +7,12 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+### Security
+
+- Added Dependabot version-update configuration for npm, Cargo, and GitHub
+  Actions.
+- Updated the compatible `rand` 0.8 dependency line to `0.8.6`.
+
 ## [0.2.1] - 2026-04-27
 
 ### Security
