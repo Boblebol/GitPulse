@@ -7,11 +7,22 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-30
+
 ### Security
 
 - Added Dependabot version-update configuration for npm, Cargo, and GitHub
   Actions.
 - Updated the compatible `rand` 0.8 dependency line to `0.8.6`.
+
+### Added
+
+- Documented the V4 roadmap for dependency security, aggregate rebuilds,
+  Reports exports, and analysis worktree placement.
+
+### Changed
+
+- Credited the author from the GitHub Pages footer.
 
 ## [0.2.1] - 2026-04-27
 
@@ -176,7 +187,8 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Rust and Jest test coverage for scanning, aggregation, stats hooks, context,
   and key UI flows.
 
-[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Boblebol/GitPulse/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Boblebol/GitPulse/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Boblebol/GitPulse/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.9...v0.2.0
 [0.2.0-rc.9]: https://github.com/Boblebol/GitPulse/compare/v0.2.0-rc.8...v0.2.0-rc.9
