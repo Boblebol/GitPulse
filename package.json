@@ -30,17 +30,17 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.97.0",
+    "@tanstack/react-query": "^5.100.6",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "^1.14.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.14.0",
+    "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -48,13 +48,13 @@
     "@types/jest": "^30.0.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@vitejs/plugin-react": "^6.0.1",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.2.4",
     "ts-jest": "^29.4.9",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "typescript": "~6.0.3",
+    "vite": "^8.0.10"
   }
 }
