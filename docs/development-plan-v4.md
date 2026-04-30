@@ -23,7 +23,7 @@ Cargo, Jest, and GitHub Dependabot.
 - [x] V4-T1 Resolve Dependabot security alerts.
 - [x] V4-T2 Add manual aggregate rebuild action.
 - [x] V4-T3 Add CSV, PDF, and PPTX exports from Reports only.
-- [ ] V4-T4 Move `.gitpulse-worktree/` outside analyzed repositories.
+- [x] V4-T4 Move `.gitpulse-worktree/` outside analyzed repositories.
 - [x] Remove temporary branch `chore/dependency-updates-site-footer`.
 - [x] Leave local `AGENTS.md` untracked and untouched.
 
@@ -177,7 +177,7 @@ downloadable formats for retros, handoffs, and release notes.
 
 ## Ticket V4-T4: Move Analysis Worktrees Outside Scanned Repositories
 
-**Status:** Planned.
+**Status:** Done.
 
 **Purpose:** remove the known limitation where `.gitpulse-worktree/` can appear
 as an untracked directory in a repository that GitPulse analyzes.

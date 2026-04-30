@@ -14,6 +14,11 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Added Reports CSV, PDF, and PPTX downloads alongside the existing Markdown
   copy flow.
 
+### Changed
+
+- Moved GitPulse-managed analysis worktrees into the app data directory instead
+  of creating `.gitpulse-worktree/` inside scanned repositories.
+
 ### Security
 
 - Updated compatible Rust dependencies and documented upstream Tauri/GTK

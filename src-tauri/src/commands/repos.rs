@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sqlx::SqlitePool;
@@ -292,9 +292,15 @@ pub async fn trigger_scan(
     state: tauri::State<'_, AppState>,
     repo_id: String,
 ) -> Result<crate::git::ScanResult, String> {
-    inner_trigger_scan_with_progress(&state.db, &repo_id, Some(scan_progress_emitter(app)))
-        .await
-        .map_err(|e| e.to_string())
+    let worktree_root = analysis_worktree_root(&state.config_dir);
+    inner_trigger_scan_with_progress(
+        &state.db,
+        &repo_id,
+        Some(scan_progress_emitter(app)),
+        Some(worktree_root.as_path()),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Pause a running scan. The scanner observes this between persisted batches.
@@ -315,9 +321,15 @@ pub async fn resume_scan(
     state: tauri::State<'_, AppState>,
     repo_id: String,
 ) -> Result<crate::git::ScanResult, String> {
-    inner_resume_scan_with_progress(&state.db, &repo_id, Some(scan_progress_emitter(app)))
-        .await
-        .map_err(|e| e.to_string())
+    let worktree_root = analysis_worktree_root(&state.config_dir);
+    inner_resume_scan_with_progress(
+        &state.db,
+        &repo_id,
+        Some(scan_progress_emitter(app)),
+        Some(worktree_root.as_path()),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Return the latest scan run status for a repository.
@@ -336,7 +348,7 @@ pub(crate) async fn inner_trigger_scan(
     pool: &SqlitePool,
     repo_id: &str,
 ) -> Result<crate::git::ScanResult, RepoError> {
-    inner_trigger_scan_with_progress(pool, repo_id, None).await
+    inner_trigger_scan_with_progress(pool, repo_id, None, None).await
 }
 
 pub(crate) async fn inner_pause_scan(
@@ -352,15 +364,16 @@ pub(crate) async fn inner_resume_scan(
     pool: &SqlitePool,
     repo_id: &str,
 ) -> Result<crate::git::ScanResult, RepoError> {
-    inner_resume_scan_with_progress(pool, repo_id, None).await
+    inner_resume_scan_with_progress(pool, repo_id, None, None).await
 }
 
 async fn inner_resume_scan_with_progress(
     pool: &SqlitePool,
     repo_id: &str,
     progress_callback: Option<crate::git::ScanProgressCallback>,
+    worktree_root: Option<&Path>,
 ) -> Result<crate::git::ScanResult, RepoError> {
-    inner_trigger_scan_with_progress(pool, repo_id, progress_callback).await
+    inner_trigger_scan_with_progress(pool, repo_id, progress_callback, worktree_root).await
 }
 
 pub(crate) async fn inner_get_scan_status(
@@ -374,6 +387,7 @@ async fn inner_trigger_scan_with_progress(
     pool: &SqlitePool,
     repo_id: &str,
     progress_callback: Option<crate::git::ScanProgressCallback>,
+    worktree_root: Option<&Path>,
 ) -> Result<crate::git::ScanResult, RepoError> {
     let (path, active_branch): (String, String) =
         sqlx::query_as("SELECT path, active_branch FROM repos WHERE id = ?")
@@ -384,17 +398,24 @@ async fn inner_trigger_scan_with_progress(
 
     crate::models::scan::ensure_no_running_scan(pool).await?;
 
+    let repo_path = Path::new(&path);
     let result = if let Some(callback) = progress_callback {
-        crate::git::scan_repo_with_progress(
-            pool,
-            repo_id,
-            Path::new(&path),
-            &active_branch,
-            callback,
-        )
-        .await?
+        if let Some(root) = worktree_root {
+            crate::git::scan_repo_with_progress_and_worktree_root(
+                pool,
+                repo_id,
+                repo_path,
+                &active_branch,
+                callback,
+                root,
+            )
+            .await?
+        } else {
+            crate::git::scan_repo_with_progress(pool, repo_id, repo_path, &active_branch, callback)
+                .await?
+        }
     } else {
-        crate::git::scan_repo(pool, repo_id, Path::new(&path), &active_branch).await?
+        crate::git::scan_repo(pool, repo_id, repo_path, &active_branch).await?
     };
     recalculate_after_scan(pool).await?;
     Ok(result)
@@ -426,6 +447,10 @@ fn scan_progress_emitter(app: tauri::AppHandle) -> crate::git::ScanProgressCallb
             warn!(%error, "failed to emit scan progress event");
         }
     })
+}
+
+fn analysis_worktree_root(config_dir: &Path) -> PathBuf {
+    config_dir.join("analysis-worktrees")
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

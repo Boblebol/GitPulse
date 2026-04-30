@@ -1,5 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
@@ -130,6 +130,7 @@ pub async fn scan_repo(
         active_branch,
         ScanOptions::default(),
         None,
+        None,
     )
     .await
 }
@@ -148,6 +149,27 @@ pub async fn scan_repo_with_progress(
         active_branch,
         ScanOptions::default(),
         Some(progress_callback),
+        None,
+    )
+    .await
+}
+
+pub async fn scan_repo_with_progress_and_worktree_root(
+    pool: &SqlitePool,
+    repo_id: &str,
+    repo_path: &Path,
+    active_branch: &str,
+    progress_callback: ScanProgressCallback,
+    worktree_root: &Path,
+) -> Result<ScanResult, GitError> {
+    scan_repo_with_options(
+        pool,
+        repo_id,
+        repo_path,
+        active_branch,
+        ScanOptions::default(),
+        Some(progress_callback),
+        Some(worktree_root),
     )
     .await
 }
@@ -159,6 +181,7 @@ async fn scan_repo_with_options(
     active_branch: &str,
     options: ScanOptions,
     progress_callback: Option<ScanProgressCallback>,
+    worktree_root: Option<&Path>,
 ) -> Result<ScanResult, GitError> {
     // Prefer the branch-specific cursor. The repo-level cursor is kept as a
     // legacy fallback for databases created before per-branch scan state.
@@ -216,6 +239,7 @@ async fn scan_repo_with_options(
             scan_run_id: &scan_run.id,
             target_head_sha: &target_head_sha,
             progress_callback: progress_callback.as_ref(),
+            worktree_root,
         },
         last_sha,
         options,
@@ -309,6 +333,7 @@ struct ScanBatchContext<'a> {
     scan_run_id: &'a str,
     target_head_sha: &'a str,
     progress_callback: Option<&'a ScanProgressCallback>,
+    worktree_root: Option<&'a Path>,
 }
 
 enum ScanBatchOutcome {
@@ -329,6 +354,7 @@ async fn scan_repo_batches(
         scan_run_id,
         target_head_sha,
         progress_callback,
+        worktree_root,
     } = context;
     let batch_size = options.batch_size.max(1);
     let mut since_sha = last_sha;
@@ -341,14 +367,26 @@ async fn scan_repo_batches(
         let path_owned = repo_path.to_path_buf();
         let branch_owned = active_branch.to_string();
         let since_sha_clone = since_sha.clone();
+        let worktree_root_owned = worktree_root.map(Path::to_path_buf);
         let raw_commits = tokio::task::spawn_blocking(move || {
-            collect_commits(
-                &path_owned,
-                &branch_owned,
-                since_sha_clone.as_deref(),
-                Some(batch_size),
-                None,
-            )
+            if let Some(root) = worktree_root_owned.as_deref() {
+                collect_commits_with_worktree_root(
+                    &path_owned,
+                    &branch_owned,
+                    since_sha_clone.as_deref(),
+                    Some(batch_size),
+                    None,
+                    Some(root),
+                )
+            } else {
+                collect_commits(
+                    &path_owned,
+                    &branch_owned,
+                    since_sha_clone.as_deref(),
+                    Some(batch_size),
+                    None,
+                )
+            }
         })
         .await
         .map_err(|e| GitError::Join(e.to_string()))??;
@@ -670,11 +708,29 @@ fn collect_commits(
     max_commits: Option<usize>,
     progress_tx: Option<tokio::sync::mpsc::Sender<usize>>,
 ) -> Result<Vec<RawCommit>, GitError> {
+    collect_commits_with_worktree_root(
+        repo_path,
+        active_branch,
+        since_sha,
+        max_commits,
+        progress_tx,
+        None,
+    )
+}
+
+fn collect_commits_with_worktree_root(
+    repo_path: &Path,
+    active_branch: &str,
+    since_sha: Option<&str>,
+    max_commits: Option<usize>,
+    progress_tx: Option<tokio::sync::mpsc::Sender<usize>>,
+    worktree_root: Option<&Path>,
+) -> Result<Vec<RawCommit>, GitError> {
     let repo = Repository::open(repo_path).map_err(|_| GitError::NotFound {
         path: repo_path.display().to_string(),
     })?;
 
-    ensure_worktree(&repo, repo_path)?;
+    ensure_worktree(&repo, repo_path, active_branch, worktree_root)?;
 
     info!(
         path = %repo_path.display(),
@@ -818,18 +874,48 @@ fn resolve_target_head_sha(repo_path: &Path, active_branch: &str) -> Result<Stri
 }
 
 /// Create the analysis worktree if it does not already exist.
-/// The worktree lives at `<repo_path>/.gitpulse-worktree/`.
-fn ensure_worktree(repo: &Repository, repo_path: &Path) -> Result<(), GitError> {
-    let worktree_path = repo_path.join(".gitpulse-worktree");
+///
+/// Tauri commands pass an app-data root so GitPulse does not write inside the
+/// analyzed repository. Legacy callers without a root keep the historical
+/// in-repository fallback.
+fn ensure_worktree(
+    repo: &Repository,
+    repo_path: &Path,
+    active_branch: &str,
+    worktree_root: Option<&Path>,
+) -> Result<(), GitError> {
+    let (worktree_name, worktree_path) = match worktree_root {
+        Some(root) => (
+            analysis_worktree_name(repo_path, active_branch),
+            analysis_worktree_path(root, repo_path, active_branch),
+        ),
+        None => (
+            "gitpulse-analysis".to_string(),
+            repo_path.join(".gitpulse-worktree"),
+        ),
+    };
 
     let worktrees = repo.worktrees()?;
-    let already_exists = worktrees.iter().any(|w| w == Some("gitpulse-analysis"));
+    let already_exists = worktrees
+        .iter()
+        .any(|worktree| worktree == Some(worktree_name.as_str()));
 
     if already_exists || worktree_path.exists() {
         return Ok(());
     }
 
-    match repo.worktree("gitpulse-analysis", &worktree_path, None) {
+    if let Some(parent) = worktree_path.parent() {
+        if let Err(error) = std::fs::create_dir_all(parent) {
+            warn!(
+                path = %parent.display(),
+                %error,
+                "could not create analysis worktree parent"
+            );
+            return Ok(());
+        }
+    }
+
+    match repo.worktree(&worktree_name, &worktree_path, None) {
         Ok(_) => {}
         Err(e) => {
             // Non-fatal: if the worktree can't be created (e.g. bare repo,
@@ -840,6 +926,55 @@ fn ensure_worktree(repo: &Repository, repo_path: &Path) -> Result<(), GitError> 
     }
 
     Ok(())
+}
+
+fn analysis_worktree_path(root: &Path, repo_path: &Path, active_branch: &str) -> PathBuf {
+    let repo_name = repo_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(sanitize_identifier)
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "repo".to_string());
+    let repo_hash = stable_hash(&repo_path.display().to_string());
+    let branch_name = sanitize_identifier(active_branch);
+
+    root.join(format!("{repo_name}-{repo_hash}"))
+        .join(branch_name)
+}
+
+fn analysis_worktree_name(repo_path: &Path, active_branch: &str) -> String {
+    let hash = stable_hash(&format!("{}:{active_branch}", repo_path.display()));
+    format!("gitpulse-analysis-{}", &hash[..12])
+}
+
+fn sanitize_identifier(value: &str) -> String {
+    let sanitized = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+
+    if sanitized.is_empty() {
+        "default".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn stable_hash(value: &str) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
 }
 
 // ── Async DB helpers ──────────────────────────────────────────────────────────
@@ -1075,6 +1210,27 @@ mod tests {
         assert!(replayed_batch.dirty_dates.is_empty());
     }
 
+    #[test]
+    fn external_worktree_root_keeps_analyzed_repo_clean() {
+        let tmp = TempDir::new().unwrap();
+        let repo = init_repo(tmp.path());
+        add_commit(&repo, "c1", "Alice", "alice@example.com", &[("a.txt", "1")]);
+        let external_root = TempDir::new().unwrap();
+
+        let commits = collect_commits_with_worktree_root(
+            tmp.path(),
+            "master",
+            None,
+            None,
+            None,
+            Some(external_root.path()),
+        )
+        .expect("collect commits");
+
+        assert_eq!(commits.len(), 1);
+        assert!(!tmp.path().join(".gitpulse-worktree").exists());
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn batched_scan_marks_dirty_scopes_for_persisted_commit_dates() {
         let pool = test_pool().await;
@@ -1108,6 +1264,7 @@ mod tests {
                 fail_after_batches: None,
                 pause_after_batches: None,
             },
+            None,
             None,
         )
         .await
@@ -1424,6 +1581,7 @@ mod tests {
                 pause_after_batches: None,
             },
             None,
+            None,
         )
         .await;
 
@@ -1496,6 +1654,7 @@ mod tests {
                 pause_after_batches: Some(1),
             },
             Some(callback),
+            None,
         )
         .await
         .unwrap();

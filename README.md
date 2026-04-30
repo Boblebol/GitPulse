@@ -143,6 +143,11 @@ branch-specific cursor. Commits are persisted in batches of 500 by default,
 with scan progress emitted to the UI. Running scans can be paused; paused or
 failed scans can be resumed from the persisted cursor.
 
+GitPulse-managed analysis worktrees are created under the Tauri app data
+directory in `analysis-worktrees/`, not inside the repositories being scanned.
+If an old `.gitpulse-worktree/` directory already exists in a repository,
+GitPulse leaves it untouched.
+
 Each persisted batch records dirty `(repo_id, date)` aggregate scopes. After a
 scan completes, only dirty daily developer/file/directory rows are rebuilt, and
 affected global developer/file/directory rows are refreshed. Alias merges and
@@ -159,8 +164,6 @@ dependencies into manual chunks.
 
 ## Known Limitations
 
-- `.gitpulse-worktree/` can appear as an untracked directory in analyzed repos;
-  keep it ignored until worktree placement is redesigned.
-- Existing databases created before recursive directory aggregation may need a
-  full aggregate rebuild before historical directory rows reflect every parent
-  directory.
+- Existing databases created before recursive directory aggregation should use
+  Settings > Rebuild analytics before historical directory rows reflect every
+  parent directory.
