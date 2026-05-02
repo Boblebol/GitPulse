@@ -16,6 +16,30 @@ export interface Repo {
   created_at: string;
 }
 
+export interface RepoImportCandidate {
+  path: string;
+  name: string;
+  branch: string;
+  already_exists: boolean;
+}
+
+export interface AddRepoInput {
+  path: string;
+  name: string;
+  branch?: string;
+}
+
+export interface RepoImportFailure {
+  path: string;
+  name: string;
+  error: string;
+}
+
+export interface AddReposResult {
+  added: Repo[];
+  failed: RepoImportFailure[];
+}
+
 export interface ScanResult {
   commits_added: number;
   files_processed: number;

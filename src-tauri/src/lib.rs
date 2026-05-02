@@ -31,6 +31,7 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let config_dir = app
@@ -62,7 +63,9 @@ pub fn run() {
             commands::repos::delete_workspace,
             commands::repos::list_repos,
             commands::repos::list_repo_branches,
+            commands::repos::discover_repo_import_candidates,
             commands::repos::add_repo,
+            commands::repos::add_repos,
             commands::repos::set_repo_branch,
             commands::repos::remove_repo,
             commands::repos::trigger_scan,

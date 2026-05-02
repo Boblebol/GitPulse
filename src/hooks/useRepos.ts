@@ -3,7 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { useAppContext } from "../context/AppContext";
-import type { Repo, ScanProgress, ScanResult, Workspace } from "../types";
+import type {
+  AddRepoInput,
+  AddReposResult,
+  Repo,
+  RepoImportCandidate,
+  ScanProgress,
+  ScanResult,
+  Workspace,
+} from "../types";
 
 type QueryInvalidator = {
   invalidateQueries: (filters: { queryKey: unknown[] }) => unknown;
@@ -128,6 +136,26 @@ export function useAddRepo() {
   >({
     mutationFn: ({ workspaceId, path, name, branch }) =>
       invoke("add_repo", { workspaceId, path, name, branch }),
+    onSuccess: (_data, vars) =>
+      qc.invalidateQueries({ queryKey: ["repos", vars.workspaceId] }),
+  });
+}
+
+export function useDiscoverRepoImportCandidates() {
+  return useMutation<RepoImportCandidate[], string, string[]>({
+    mutationFn: (paths) => invoke("discover_repo_import_candidates", { paths }),
+  });
+}
+
+export function useAddRepos() {
+  const qc = useQueryClient();
+  return useMutation<
+    AddReposResult,
+    string,
+    { workspaceId: string; repos: AddRepoInput[] }
+  >({
+    mutationFn: ({ workspaceId, repos }) =>
+      invoke("add_repos", { workspaceId, repos }),
     onSuccess: (_data, vars) =>
       qc.invalidateQueries({ queryKey: ["repos", vars.workspaceId] }),
   });

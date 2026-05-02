@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   useWorkspaces,
   useCreateWorkspace,
   useDeleteWorkspace,
   useAddRepo,
+  useAddRepos,
+  useDiscoverRepoImportCandidates,
   useRepos,
   useTriggerScan,
   useSetRepoBranch,
@@ -15,8 +18,17 @@ import {
 } from "../hooks/useRepos";
 import { useUpdateFormula } from "../hooks/useStats";
 import { useAppContext } from "../context/AppContext";
-import { Plus, Trash2, RefreshCw, FlaskConical, ChevronDown, Pause, Play } from "lucide-react";
-import type { Repo, ScanProgress } from "../types";
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  FlaskConical,
+  ChevronDown,
+  Pause,
+  Play,
+  FolderOpen,
+} from "lucide-react";
+import type { Repo, RepoImportCandidate, ScanProgress } from "../types";
 import FieldHint from "../components/FieldHint";
 import HelpTooltip from "../components/HelpTooltip";
 import PageHelp from "../components/PageHelp";
@@ -67,6 +79,11 @@ function formatScanStatus(status: ScanProgress["status"]) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function normalizeDialogPaths(result: string | string[] | null): string[] {
+  if (result == null) return [];
+  return Array.isArray(result) ? result : [result];
+}
+
 function RepoBranchPicker({
   repo,
   workspaceId,
@@ -109,13 +126,25 @@ function RepoBranchPicker({
 }
 
 export default function Settings() {
-  const { workspaceId, setWorkspaceId, setRepoId, scanningRepoId, setScanningRepoId, syncStatus, setSyncStatus, scanProgressByRepo, addNotification } = useAppContext();
+  const {
+    workspaceId,
+    setWorkspaceId,
+    setRepoId,
+    scanningRepoId,
+    setScanningRepoId,
+    syncStatus,
+    setSyncStatus,
+    scanProgressByRepo,
+    addNotification,
+  } = useAppContext();
   const queryClient = useQueryClient();
   const { data: workspaces = [] } = useWorkspaces();
   const { data: repos = [] } = useRepos(workspaceId);
   const createWs = useCreateWorkspace();
   const deleteWs = useDeleteWorkspace();
   const addRepo = useAddRepo();
+  const discoverRepoImportCandidates = useDiscoverRepoImportCandidates();
+  const addRepos = useAddRepos();
   const triggerScan = useTriggerScan();
   const pauseScan = usePauseScan();
   const resumeScan = useResumeScan();
@@ -131,10 +160,25 @@ export default function Settings() {
   const [repoPath, setRepoPath] = useState("");
   const [repoName, setRepoName] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string | undefined>();
+  const [importCandidates, setImportCandidates] = useState<RepoImportCandidate[]>(
+    [],
+  );
+  const [selectedImportPaths, setSelectedImportPaths] = useState<Set<string>>(
+    new Set(),
+  );
   const [formula, setFormula] = useState(DEFAULT_FORMULA);
 
   // For listing branches when adding a new repo
   const [branches, setBranches] = useState<string[]>([]);
+  const importableCandidates = importCandidates.filter(
+    (candidate) => !candidate.already_exists,
+  );
+  const selectedImportCount = importableCandidates.filter((candidate) =>
+    selectedImportPaths.has(candidate.path),
+  ).length;
+  const allImportableSelected =
+    importableCandidates.length > 0 &&
+    selectedImportCount === importableCandidates.length;
 
   const handleDeleteAllData = () => {
     const confirmed = window.confirm(
@@ -154,6 +198,8 @@ export default function Settings() {
         setRepoName("");
         setBranches([]);
         setSelectedBranch(undefined);
+        setImportCandidates([]);
+        setSelectedImportPaths(new Set());
         setFormula(DEFAULT_FORMULA);
         addNotification("All local GitPulse data was deleted.", "success");
       },
@@ -175,6 +221,98 @@ export default function Settings() {
         addNotification(`Could not rebuild analytics: ${error}`, "error");
       },
     });
+  };
+
+  const handleBrowseRepoFolders = async () => {
+    try {
+      const result = await open({
+        directory: true,
+        multiple: true,
+        title: "Select repository folders",
+      });
+      const paths = normalizeDialogPaths(result);
+      if (paths.length === 0) return;
+
+      discoverRepoImportCandidates.mutate(paths, {
+        onSuccess: (candidates) => {
+          setImportCandidates(candidates);
+          setSelectedImportPaths(
+            new Set(
+              candidates
+                .filter((candidate) => !candidate.already_exists)
+                .map((candidate) => candidate.path),
+            ),
+          );
+          if (candidates.length === 0) {
+            addNotification("No Git repositories were found in the selected folders.", "error");
+          }
+        },
+        onError: (error) => {
+          addNotification(`Could not inspect selected folders: ${error}`, "error");
+        },
+      });
+    } catch (error) {
+      addNotification(`Could not open folder picker: ${error}`, "error");
+    }
+  };
+
+  const toggleImportCandidate = (path: string) => {
+    setSelectedImportPaths((current) => {
+      const next = new Set(current);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllImportCandidates = () => {
+    setSelectedImportPaths(() => {
+      if (allImportableSelected) return new Set();
+      return new Set(importableCandidates.map((candidate) => candidate.path));
+    });
+  };
+
+  const handleImportSelectedRepos = () => {
+    if (!workspaceId) return;
+
+    const selectedRepos = importableCandidates
+      .filter((candidate) => selectedImportPaths.has(candidate.path))
+      .map((candidate) => ({
+        path: candidate.path,
+        name: candidate.name,
+        branch: candidate.branch,
+      }));
+
+    addRepos.mutate(
+      { workspaceId, repos: selectedRepos },
+      {
+        onSuccess: (result) => {
+          if (result.failed.length === 0) {
+            setImportCandidates([]);
+            setSelectedImportPaths(new Set());
+          } else {
+            const failedPaths = new Set(result.failed.map((failure) => failure.path));
+            setImportCandidates((current) =>
+              current.filter((candidate) => failedPaths.has(candidate.path)),
+            );
+            setSelectedImportPaths(failedPaths);
+          }
+
+          if (result.added.length > 0) {
+            addNotification(`${result.added.length} repositories imported.`, "success");
+          }
+          if (result.failed.length > 0) {
+            addNotification(`${result.failed.length} repositories could not be imported.`, "error");
+          }
+        },
+        onError: (error) => {
+          addNotification(`Could not import repositories: ${error}`, "error");
+        },
+      },
+    );
   };
 
   // Load branches when path changes
@@ -209,6 +347,8 @@ export default function Settings() {
   useEffect(() => {
     setScanningRepoId(null);
     setSyncStatus("");
+    setImportCandidates([]);
+    setSelectedImportPaths(new Set());
   }, [workspaceId]);
 
   return (
@@ -256,7 +396,10 @@ export default function Settings() {
             />
             <button
               disabled={!wsName.trim() || createWs.isPending}
-              onClick={() => { createWs.mutate(wsName.trim()); setWsName(""); }}
+              onClick={() => {
+                createWs.mutate(wsName.trim());
+                setWsName("");
+              }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40"
             >
               <Plus size={14} /> Create
@@ -278,12 +421,18 @@ export default function Settings() {
                   ? "bg-surface-container-highest"
                   : "bg-surface-container hover:bg-surface-container-high",
               ].join(" ")}
-              onClick={() => { setWorkspaceId(ws.id); setRepoId(null); }}
+              onClick={() => {
+                setWorkspaceId(ws.id);
+                setRepoId(null);
+              }}
             >
               <span className="text-sm text-on-surface font-medium">{ws.name}</span>
               <button
                 aria-label={`Delete workspace ${ws.name}`}
-                onClick={(e) => { e.stopPropagation(); deleteWs.mutate(ws.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteWs.mutate(ws.id);
+                }}
                 className="text-on-surface-variant hover:text-error transition-colors"
               >
                 <Trash2 size={14} />
@@ -299,64 +448,72 @@ export default function Settings() {
           className="text-sm uppercase tracking-widest text-on-surface-variant"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
-          Repositories {workspaceId ? `— ${workspaces.find((w) => w.id === workspaceId)?.name ?? ""}` : "(select a workspace)"}
+          Repositories{" "}
+          {workspaceId
+            ? `— ${workspaces.find((w) => w.id === workspaceId)?.name ?? ""}`
+            : "(select a workspace)"}
         </h2>
 
         {workspaceId && (
           <>
             <div className="space-y-1">
               <div className="flex gap-2">
-              <input
-                aria-label="Repository path"
-                aria-describedby="repo-path-hint"
-                value={repoPath}
-                onChange={(e) => setRepoPath(e.target.value)}
-                placeholder="/absolute/path/to/repo"
-                className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50 font-mono"
-              />
-              <input
-                aria-label="Repository display name"
-                aria-describedby="repo-name-hint"
-                value={repoName}
-                onChange={(e) => setRepoName(e.target.value)}
-                placeholder="Display name"
-                className="w-36 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50"
-              />
-              {branches.length > 0 && (
-                <div className="relative w-auto max-w-xs">
-                  <select
-                    aria-label="Initial branch"
-                    aria-describedby="repo-branch-hint"
-                    value={selectedBranch || ""}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full appearance-none bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-8 truncate"
-                  >
-                    {branches.map((branch) => (
-                      <option key={branch} value={branch}>
-                        {branch}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                </div>
-              )}
-              <button
-                disabled={!repoPath.trim() || !repoName.trim() || addRepo.isPending || branches.length === 0}
-                onClick={() => {
-                  addRepo.mutate({
-                    workspaceId,
-                    path: repoPath.trim(),
-                    name: repoName.trim(),
-                    branch: selectedBranch
-                  });
-                  setRepoPath("");
-                  setRepoName("");
-                  setSelectedBranch(undefined);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40"
-              >
-                <Plus size={14} /> Add
-              </button>
+                <input
+                  aria-label="Repository path"
+                  aria-describedby="repo-path-hint"
+                  value={repoPath}
+                  onChange={(e) => setRepoPath(e.target.value)}
+                  placeholder="/absolute/path/to/repo"
+                  className="flex-1 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50 font-mono"
+                />
+                <input
+                  aria-label="Repository display name"
+                  aria-describedby="repo-name-hint"
+                  value={repoName}
+                  onChange={(e) => setRepoName(e.target.value)}
+                  placeholder="Display name"
+                  className="w-36 bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 placeholder:text-on-surface-variant/50"
+                />
+                {branches.length > 0 && (
+                  <div className="relative w-auto max-w-xs">
+                    <select
+                      aria-label="Initial branch"
+                      aria-describedby="repo-branch-hint"
+                      value={selectedBranch || ""}
+                      onChange={(e) => setSelectedBranch(e.target.value)}
+                      className="w-full appearance-none bg-surface-container text-on-surface text-sm rounded-lg px-3 py-2 outline-none ring-1 ring-outline-variant/30 focus:ring-primary/40 cursor-pointer pr-8 truncate"
+                    >
+                      {branches.map((branch) => (
+                        <option key={branch} value={branch}>
+                          {branch}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+                  </div>
+                )}
+                <button
+                  disabled={
+                    !repoPath.trim() ||
+                    !repoName.trim() ||
+                    addRepo.isPending ||
+                    branches.length === 0
+                  }
+                  onClick={() => {
+                    addRepo.mutate({
+                      workspaceId,
+                      path: repoPath.trim(),
+                      name: repoName.trim(),
+                      branch: selectedBranch,
+                    });
+                    setRepoPath("");
+                    setRepoName("");
+                    setSelectedBranch(undefined);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold text-on-primary gradient-primary disabled:opacity-40"
+                >
+                  <Plus size={14} /> Add
+                </button>
               </div>
               <FieldHint id="repo-path-hint">
                 Use an absolute local path, for example <code className="text-primary">/Users/alex/project</code>. GitPulse reads Git history only.
@@ -370,8 +527,96 @@ export default function Settings() {
                 </FieldHint>
               )}
             </div>
+            <div className="space-y-2 rounded-lg bg-surface-container px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Bulk import</p>
+                  <p className="text-xs text-on-surface-variant">
+                    Select several repository folders or one parent folder containing repositories.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={discoverRepoImportCandidates.isPending || addRepos.isPending}
+                  onClick={handleBrowseRepoFolders}
+                  className="flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-2 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-highest disabled:opacity-40"
+                >
+                  <FolderOpen size={14} /> Browse folders
+                </button>
+              </div>
+
+              {importCandidates.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/20 pt-2">
+                    <label className="flex items-center gap-2 text-xs font-medium text-on-surface">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all repositories"
+                        checked={allImportableSelected}
+                        disabled={importableCandidates.length === 0 || addRepos.isPending}
+                        onChange={toggleAllImportCandidates}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      Select all
+                    </label>
+                    <button
+                      type="button"
+                      disabled={selectedImportCount === 0 || addRepos.isPending}
+                      onClick={handleImportSelectedRepos}
+                      className="flex items-center gap-1.5 rounded-full text-sm font-semibold text-on-primary gradient-primary px-3 py-2 disabled:opacity-40"
+                    >
+                      <Plus size={14} /> Import {selectedImportCount} repos
+                    </button>
+                  </div>
+                  <div className="max-h-56 space-y-1 overflow-auto pr-1">
+                    {importCandidates.map((candidate) => {
+                      const isSelected = selectedImportPaths.has(candidate.path);
+                      return (
+                        <label
+                          key={candidate.path}
+                          className={[
+                            "flex items-start gap-2 rounded-md px-2 py-2 text-sm",
+                            candidate.already_exists
+                              ? "bg-surface-container-high/40 text-on-surface-variant"
+                              : "bg-surface-container-high text-on-surface",
+                          ].join(" ")}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={`Import ${candidate.name}`}
+                            checked={isSelected}
+                            disabled={candidate.already_exists || addRepos.isPending}
+                            onChange={() => toggleImportCandidate(candidate.path)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-medium">{candidate.name}</span>
+                              <span className="rounded bg-surface-container-highest px-1.5 py-0.5 text-[11px] text-on-surface-variant">
+                                {candidate.branch}
+                              </span>
+                              {candidate.already_exists && (
+                                <span className="text-[11px] text-on-surface-variant">
+                                  Already imported
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-0.5 block truncate font-mono text-xs text-on-surface-variant">
+                              {candidate.path}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             {addRepo.isError && (
               <p className="text-xs text-error">{addRepo.error}</p>
+            )}
+            {addRepos.isError && (
+              <p className="text-xs text-error">{addRepos.error}</p>
             )}
 
             <div className="space-y-1">

@@ -8,7 +8,12 @@ jest.mock("@tauri-apps/api/core", () => ({
   invoke: jest.fn(),
 }));
 
+jest.mock("@tauri-apps/plugin-dialog", () => ({
+  open: jest.fn(),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 describe("Settings", () => {
   let queryClient: QueryClient;
@@ -37,6 +42,7 @@ describe("Settings", () => {
       }
       return Promise.resolve([]);
     });
+    (open as jest.Mock).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -91,5 +97,102 @@ describe("Settings", () => {
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("rebuild_aggregates");
     });
+  });
+
+  it("imports selected repository folders into the current workspace", async () => {
+    (invoke as jest.Mock).mockImplementation((command: string, args?: Record<string, unknown>) => {
+      if (command === "list_workspaces") {
+        return Promise.resolve([{ id: "ws1", name: "Product", created_at: "2026-05-02T10:00:00Z" }]);
+      }
+      if (command === "list_repos") return Promise.resolve([]);
+      if (command === "discover_repo_import_candidates") {
+        expect(args).toEqual({ paths: ["/projects/api", "/projects/web"] });
+        return Promise.resolve([
+          { path: "/projects/api", name: "api", branch: "main", already_exists: false },
+          { path: "/projects/web", name: "web", branch: "master", already_exists: false },
+        ]);
+      }
+      if (command === "add_repos") {
+        return Promise.resolve({
+          added: [
+            {
+              id: "repo-api",
+              workspace_id: "ws1",
+              name: "api",
+              path: "/projects/api",
+              active_branch: "main",
+              last_indexed_commit_sha: null,
+              created_at: "2026-05-02T10:00:00Z",
+            },
+            {
+              id: "repo-web",
+              workspace_id: "ws1",
+              name: "web",
+              path: "/projects/web",
+              active_branch: "master",
+              last_indexed_commit_sha: null,
+              created_at: "2026-05-02T10:00:01Z",
+            },
+          ],
+          failed: [],
+        });
+      }
+      return Promise.resolve([]);
+    });
+    (open as jest.Mock).mockResolvedValue(["/projects/api", "/projects/web"]);
+
+    renderSettings();
+
+    await userEvent.click(await screen.findByText("Product"));
+    await userEvent.click(screen.getByRole("button", { name: /browse folders/i }));
+    await screen.findByText("/projects/api");
+    expect(screen.getByText("/projects/web")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /import 2 repos/i }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("add_repos", {
+        workspaceId: "ws1",
+        repos: [
+          { path: "/projects/api", name: "api", branch: "main" },
+          { path: "/projects/web", name: "web", branch: "master" },
+        ],
+      });
+    });
+  });
+
+  it("lets users select all discovered repository folders", async () => {
+    (invoke as jest.Mock).mockImplementation((command: string) => {
+      if (command === "list_workspaces") {
+        return Promise.resolve([{ id: "ws1", name: "Product", created_at: "2026-05-02T10:00:00Z" }]);
+      }
+      if (command === "list_repos") return Promise.resolve([]);
+      if (command === "discover_repo_import_candidates") {
+        return Promise.resolve([
+          { path: "/projects/api", name: "api", branch: "main", already_exists: false },
+          { path: "/projects/web", name: "web", branch: "main", already_exists: false },
+        ]);
+      }
+      if (command === "add_repos") return Promise.resolve({ added: [], failed: [] });
+      return Promise.resolve([]);
+    });
+    (open as jest.Mock).mockResolvedValue(["/projects/api", "/projects/web"]);
+
+    renderSettings();
+
+    await userEvent.click(await screen.findByText("Product"));
+    await userEvent.click(screen.getByRole("button", { name: /browse folders/i }));
+    await screen.findByText("/projects/api");
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /select all repositories/i }));
+
+    expect(screen.getByRole("checkbox", { name: /import api/i })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /import web/i })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: /import 0 repos/i })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /select all repositories/i }));
+
+    expect(screen.getByRole("checkbox", { name: /import api/i })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /import web/i })).toBeChecked();
   });
 });

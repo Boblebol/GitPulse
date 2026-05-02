@@ -1,6 +1,8 @@
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tauri::Emitter;
 use tracing::warn;
@@ -29,6 +31,34 @@ pub(crate) enum RepoError {
     ScanRun(#[from] crate::models::scan::ScanRunError),
     #[error("aggregation error: {0}")]
     Agg(#[from] crate::aggregation::AggError),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoImportCandidate {
+    pub path: String,
+    pub name: String,
+    pub branch: String,
+    pub already_exists: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddRepoInput {
+    pub path: String,
+    pub name: String,
+    pub branch: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoImportFailure {
+    pub path: String,
+    pub name: String,
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddReposResult {
+    pub added: Vec<Repo>,
+    pub failed: Vec<RepoImportFailure>,
 }
 
 // ── Workspaces ────────────────────────────────────────────────────────────────
@@ -151,6 +181,130 @@ fn inner_list_branches(path: &str) -> Result<Vec<String>, RepoError> {
     Ok(branches)
 }
 
+/// Discover local git repositories from selected folders.
+///
+/// Each selected path can be either a git repository itself or a parent folder
+/// containing direct child git repositories.
+#[tauri::command]
+pub async fn discover_repo_import_candidates(
+    state: tauri::State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<Vec<RepoImportCandidate>, String> {
+    inner_discover_repo_import_candidates(&state.db, paths)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_discover_repo_import_candidates(
+    pool: &SqlitePool,
+    paths: Vec<String>,
+) -> Result<Vec<RepoImportCandidate>, RepoError> {
+    let mut discovered = BTreeSet::new();
+
+    for raw_path in paths {
+        let path = PathBuf::from(raw_path);
+        if !path.exists() {
+            return Err(RepoError::PathNotFound(path.to_string_lossy().to_string()));
+        }
+
+        if is_git_repo(&path) {
+            discovered.insert(repo_path_string(&path));
+            continue;
+        }
+
+        if !path.is_dir() {
+            continue;
+        }
+
+        for entry in std::fs::read_dir(&path)
+            .map_err(|_| RepoError::PathNotFound(path.to_string_lossy().to_string()))?
+        {
+            let entry =
+                entry.map_err(|_| RepoError::PathNotFound(path.to_string_lossy().to_string()))?;
+            let child_path = entry.path();
+            if child_path.is_dir() && is_git_repo(&child_path) {
+                discovered.insert(repo_path_string(&child_path));
+            }
+        }
+    }
+
+    let mut candidates = Vec::new();
+    for path in discovered {
+        let name = default_repo_name(&path);
+        let branch = detect_repo_branch(&path, None)?;
+        let already_exists = repo_path_exists(pool, &path).await?;
+        candidates.push(RepoImportCandidate {
+            path,
+            name,
+            branch,
+            already_exists,
+        });
+    }
+
+    Ok(candidates)
+}
+
+fn is_git_repo(path: &Path) -> bool {
+    git2::Repository::open(path).is_ok()
+}
+
+fn repo_path_string(path: &Path) -> String {
+    path.canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .to_string()
+}
+
+fn default_repo_name(path: &str) -> String {
+    Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| path.to_string())
+}
+
+async fn repo_path_exists(pool: &SqlitePool, path: &str) -> Result<bool, RepoError> {
+    let exists: Option<i64> = sqlx::query_scalar("SELECT 1 FROM repos WHERE path = ? LIMIT 1")
+        .bind(path)
+        .fetch_optional(pool)
+        .await?;
+    Ok(exists.is_some())
+}
+
+fn detect_repo_branch(path: &str, provided_branch: Option<String>) -> Result<String, RepoError> {
+    if let Some(branch) = provided_branch {
+        return Ok(branch);
+    }
+
+    let git_repo =
+        git2::Repository::open(path).map_err(|_| RepoError::NotARepo(path.to_string()))?;
+
+    let current_branch = git_repo
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(|branch| branch.to_string()));
+
+    if let Some(branch) = current_branch {
+        return Ok(branch);
+    }
+
+    match inner_list_branches(path) {
+        Ok(branches) => {
+            if branches.contains(&"main".to_string()) {
+                Ok("main".to_string())
+            } else if branches.contains(&"master".to_string()) {
+                Ok("master".to_string())
+            } else if !branches.is_empty() {
+                Ok(branches[0].clone())
+            } else {
+                Ok("main".to_string())
+            }
+        }
+        Err(_) => Ok("main".to_string()),
+    }
+}
+
 /// Add a repository to a workspace.
 /// Validates the path exists and is a git repository; detects the active branch.
 /// If no branch is provided, uses the current HEAD or defaults to "main" or "master".
@@ -178,38 +332,7 @@ pub(crate) async fn inner_add_repo(
         return Err(RepoError::PathNotFound(path));
     }
 
-    let branch = if let Some(b) = provided_branch {
-        b
-    } else {
-        // Auto-detect: try current HEAD, then check for "main" or "master"
-        let git_repo =
-            git2::Repository::open(&path).map_err(|_| RepoError::NotARepo(path.clone()))?;
-
-        let current_branch = git_repo
-            .head()
-            .ok()
-            .and_then(|h| h.shorthand().map(|s| s.to_string()));
-
-        if let Some(b) = current_branch {
-            b
-        } else {
-            // Fallback: check for "main" or "master" branches
-            match inner_list_branches(&path) {
-                Ok(branches) => {
-                    if branches.contains(&"main".to_string()) {
-                        "main".to_string()
-                    } else if branches.contains(&"master".to_string()) {
-                        "master".to_string()
-                    } else if !branches.is_empty() {
-                        branches[0].clone()
-                    } else {
-                        "main".to_string()
-                    }
-                }
-                Err(_) => "main".to_string(),
-            }
-        }
-    };
+    let branch = detect_repo_branch(&path, provided_branch)?;
 
     let mut repo = Repo::new(workspace_id, name, &path);
     repo.active_branch = branch;
@@ -228,6 +351,48 @@ pub(crate) async fn inner_add_repo(
     .await?;
 
     Ok(repo)
+}
+
+/// Add multiple repositories to a workspace in one request.
+#[tauri::command]
+pub async fn add_repos(
+    state: tauri::State<'_, AppState>,
+    workspace_id: String,
+    repos: Vec<AddRepoInput>,
+) -> Result<AddReposResult, String> {
+    inner_add_repos(&state.db, workspace_id, repos)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub(crate) async fn inner_add_repos(
+    pool: &SqlitePool,
+    workspace_id: String,
+    repos: Vec<AddRepoInput>,
+) -> Result<AddReposResult, RepoError> {
+    let mut added = Vec::new();
+    let mut failed = Vec::new();
+
+    for input in repos {
+        match inner_add_repo(
+            pool,
+            workspace_id.clone(),
+            input.path.clone(),
+            input.name.clone(),
+            input.branch.clone(),
+        )
+        .await
+        {
+            Ok(repo) => added.push(repo),
+            Err(error) => failed.push(RepoImportFailure {
+                path: input.path,
+                name: input.name,
+                error: error.to_string(),
+            }),
+        }
+    }
+
+    Ok(AddReposResult { added, failed })
 }
 
 /// Change the active branch for a repository.
@@ -547,6 +712,107 @@ mod tests {
         .await
         .unwrap_err();
         assert!(err.to_string().contains("not a git repository"));
+    }
+
+    #[tokio::test]
+    async fn discover_repo_import_candidates_accepts_repo_paths_and_child_repos() {
+        let pool = test_pool().await;
+        let root = TempDir::new().unwrap();
+        let api = root.path().join("api");
+        let web = root.path().join("web");
+        let notes = root.path().join("notes");
+        std::fs::create_dir_all(&api).unwrap();
+        std::fs::create_dir_all(&web).unwrap();
+        std::fs::create_dir_all(&notes).unwrap();
+        init_repo(&api);
+        init_repo(&web);
+
+        let candidates = inner_discover_repo_import_candidates(
+            &pool,
+            vec![root.path().to_string_lossy().to_string()],
+        )
+        .await
+        .unwrap();
+
+        let paths = candidates
+            .iter()
+            .map(|candidate| candidate.path.as_str())
+            .collect::<Vec<_>>();
+        let expected_api = api.canonicalize().unwrap().to_string_lossy().to_string();
+        let expected_web = web.canonicalize().unwrap().to_string_lossy().to_string();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&expected_api.as_str()));
+        assert!(paths.contains(&expected_web.as_str()));
+        assert!(candidates.iter().all(|candidate| !candidate.already_exists));
+    }
+
+    #[tokio::test]
+    async fn add_repos_imports_multiple_repositories_into_one_workspace() {
+        let pool = test_pool().await;
+        let api = TempDir::new().unwrap();
+        let web = TempDir::new().unwrap();
+        init_repo(api.path());
+        init_repo(web.path());
+        let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
+
+        let result = inner_add_repos(
+            &pool,
+            ws.id.clone(),
+            vec![
+                AddRepoInput {
+                    path: api.path().to_string_lossy().to_string(),
+                    name: "api".to_string(),
+                    branch: Some("main".to_string()),
+                },
+                AddRepoInput {
+                    path: web.path().to_string_lossy().to_string(),
+                    name: "web".to_string(),
+                    branch: None,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.added.len(), 2);
+        assert!(result.failed.is_empty());
+
+        let repos = inner_list_repos(&pool, &ws.id).await.unwrap();
+        assert_eq!(repos.len(), 2);
+        assert!(repos.iter().any(|repo| repo.name == "api"));
+        assert!(repos.iter().any(|repo| repo.name == "web"));
+    }
+
+    #[tokio::test]
+    async fn add_repos_reports_per_repo_failures_without_stopping_the_batch() {
+        let pool = test_pool().await;
+        let valid = TempDir::new().unwrap();
+        init_repo(valid.path());
+        let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
+
+        let result = inner_add_repos(
+            &pool,
+            ws.id.clone(),
+            vec![
+                AddRepoInput {
+                    path: valid.path().to_string_lossy().to_string(),
+                    name: "valid".to_string(),
+                    branch: None,
+                },
+                AddRepoInput {
+                    path: "/no/such/repo".to_string(),
+                    name: "missing".to_string(),
+                    branch: None,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.added.len(), 1);
+        assert_eq!(result.failed.len(), 1);
+        assert_eq!(result.failed[0].path, "/no/such/repo");
+        assert!(result.failed[0].error.contains("does not exist"));
     }
 
     #[tokio::test]
