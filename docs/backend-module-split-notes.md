@@ -6,6 +6,13 @@ This note records safe future splits for the largest GitPulse files. The goal is
 to reduce regression risk without mixing broad refactors into security, release,
 or product-fix branches.
 
+Progress:
+
+- 2026-05-03: extracted the Settings bulk repo import UI into
+  `src/components/settings/BulkRepoImport.tsx`.
+- 2026-05-03: extracted repo import models and discovery helpers into
+  `src-tauri/src/commands/repo_import.rs`.
+
 ## Principles
 
 - Split only when touching a file for adjacent behavior.
@@ -183,8 +190,8 @@ pnpm run build
 
 ## Recommended Order
 
-1. Extract `BulkRepoImport.tsx` from `Settings.tsx`.
-2. Extract repo import helpers from `commands/repos.rs`.
+1. Done: extract `BulkRepoImport.tsx` from `Settings.tsx`.
+2. Done: extract repo import helpers from `commands/repos.rs`.
 3. Extract worktree helpers from `git/scanner.rs`.
 4. Extract shared period/scope helpers from Rust commands.
 5. Split health/history/stats by endpoint family after the shared helpers are

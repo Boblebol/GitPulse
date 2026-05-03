@@ -5,5 +5,6 @@ pub mod health;
 pub mod history;
 pub mod insights;
 pub mod recaps;
+pub mod repo_import;
 pub mod repos;
 pub mod stats;
