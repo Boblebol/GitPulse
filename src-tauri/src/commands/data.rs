@@ -274,11 +274,10 @@ mod tests {
         assert!(!result.started_at.is_empty());
         assert!(!result.completed_at.is_empty());
 
-        let developer_rows: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let developer_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(developer_rows, 1);
 
         let commits: i64 = sqlx::query_scalar(
@@ -322,11 +321,10 @@ mod tests {
 
         assert!(error.contains("scan already running"));
 
-        let developer_rows: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let developer_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stats_daily_developer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(developer_rows, 0);
     }
 

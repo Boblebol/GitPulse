@@ -538,7 +538,10 @@ mod tests {
 
     #[test]
     fn repo_import_default_name_uses_leaf_directory() {
-        assert_eq!(crate::commands::repo_import::default_repo_name("/tmp/api"), "api");
+        assert_eq!(
+            crate::commands::repo_import::default_repo_name("/tmp/api"),
+            "api"
+        );
     }
 
     #[tokio::test]
