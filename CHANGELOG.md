@@ -12,6 +12,12 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 - Added bulk folder import so users can add multiple repositories from one or
   more folders in a single flow.
 
+### Security
+
+- Applied compatible Dependabot updates for frontend packages, GitHub Actions,
+  and Rust/Tauri dependencies; documented the remaining upstream blockers for
+  `glib 0.18.5` and `rand 0.7.3`.
+
 ## [0.3.0] - 2026-04-30
 
 ### Added

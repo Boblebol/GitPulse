@@ -468,16 +468,26 @@ export function buildReportPptxBytes(input: ReportExportInput): Uint8Array {
   );
 }
 
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 function reportBlob(input: ReportExportInput, format: ReportExportFormat): Blob {
   if (format === "csv") {
     return new Blob([buildReportCsv(input)], { type: MIME_TYPES.csv });
   }
 
   if (format === "pdf") {
-    return new Blob([buildReportPdfBytes(input)], { type: MIME_TYPES.pdf });
+    return new Blob([bytesToArrayBuffer(buildReportPdfBytes(input))], {
+      type: MIME_TYPES.pdf,
+    });
   }
 
-  return new Blob([buildReportPptxBytes(input)], { type: MIME_TYPES.pptx });
+  return new Blob([bytesToArrayBuffer(buildReportPptxBytes(input))], {
+    type: MIME_TYPES.pptx,
+  });
 }
 
 export function downloadReportFile(

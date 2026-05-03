@@ -3,8 +3,10 @@
 Last reviewed: 2026-05-03.
 
 This document tracks current Dependabot security alerts that remain in the
-Tauri/Rust dependency graph after compatible updates. The recommended decision
-for the current release is to monitor these alerts with explicit blockers, not
+Tauri/Rust dependency graph after compatible updates. Compatible Dependabot
+updates were applied on 2026-05-03, including Tauri `2.11.0`, wry `0.55.0`,
+tauri-utils `2.9.0`, and evalexpr `13.1.0`. The recommended decision for the
+current release is to monitor the remaining alerts with explicit blockers, not
 force a risky Tauri, GTK, or Cargo patch override.
 
 ## Current Alerts
@@ -14,20 +16,22 @@ force a risky Tauri, GTK, or Cargo patch override.
 - Severity: medium.
 - Status: open, upstream blocked.
 - Path: Linux desktop stack through `gtk 0.18.2`, `webkit2gtk 2.0.2`,
-  `wry 0.54.4`, `tauri-runtime-wry 2.10.1`, and `tauri 2.10.3`.
+  `wry 0.55.0`, `tauri-runtime-wry 2.11.0`, and `tauri 2.11.0`.
 - Decision: do not force `glib 0.20.x` with `[patch]` or a direct override. The
-  current GTK line requires `glib = "^0.18"`, so a safe fix needs an
-  upstream-compatible Tauri/wry/GTK update.
+  current GTK line requires `glib = "^0.18"`, confirmed by
+  `cargo update -p glib --precise 0.20.12` failing dependency resolution. A safe
+  fix needs an upstream-compatible Tauri/wry/GTK update.
 
 ### `rand 0.7.3`
 
 - Severity: low.
 - Status: open, upstream blocked.
 - Path: build-time transitive path through `selectors 0.24.0`,
-  `kuchikiki 0.8.8-speedreader`, and `tauri-utils 2.8.3`.
+  `kuchikiki 0.8.8-speedreader`, and `tauri-utils 2.9.0`.
 - Decision: keep monitoring `selectors`, `kuchikiki`, and `tauri-utils`. The
   graph already also contains `rand 0.8.6`; the remaining alert is the older
-  transitive build dependency.
+  transitive build dependency. `cargo update -p rand@0.7.3 --precise 0.8.6`
+  fails because `phf_generator 0.8.0` requires `rand = "^0.7"`.
 
 These are not direct GitPulse dependencies. They should not be dismissed as
 "ignored"; if GitHub requires a dismissal, link to this document and use an
