@@ -4,9 +4,10 @@
 > maintenance, report exports, and scan isolation as separate commits. Do not
 > touch local context files such as `AGENTS.md`.
 
-**Goal:** prepare the next GitPulse release by closing current security alerts,
-adding a safe aggregate maintenance action, expanding Reports exports, and
-moving analysis worktrees outside scanned repositories.
+**Goal:** prepare the next GitPulse release by documenting current transitive
+security alerts, adding a safe aggregate maintenance action, expanding Reports
+exports, moving analysis worktrees outside scanned repositories, and recording
+the next desktop E2E QA step.
 
 **Architecture:** keep the existing Tauri 2 + Rust + SQLite + React stack.
 Security work should prefer upstream-compatible dependency updates over Cargo
@@ -20,10 +21,11 @@ Cargo, Jest, and GitHub Dependabot.
 
 ## Implementation Status
 
-- [x] V4-T1 Resolve Dependabot security alerts.
+- [x] V4-T1 Document and monitor Dependabot security alerts.
 - [x] V4-T2 Add manual aggregate rebuild action.
 - [x] V4-T3 Add CSV, PDF, and PPTX exports from Reports only.
 - [x] V4-T4 Move `.gitpulse-worktree/` outside analyzed repositories.
+- [ ] V4-QA1 Add real desktop E2E smoke coverage.
 - [x] Remove temporary branch `chore/dependency-updates-site-footer`.
 - [x] Leave local `AGENTS.md` untracked and untouched.
 
@@ -38,57 +40,64 @@ Cargo, Jest, and GitHub Dependabot.
 - Analysis worktrees should live in GitPulse-managed app data, not inside the
   repository being analyzed.
 - If a dependency alert is blocked by upstream Tauri/Linux GTK dependencies,
-  document the blocker rather than forcing an unsafe patch.
+  document the blocker rather than forcing an unsafe patch. Current status lives
+  in [Security Dependency Status](security-dependency-status.md).
 
 ---
 
-## Ticket V4-T1: Resolve Dependabot Security Alerts
+## Ticket V4-T1: Document Dependabot Security Alerts
 
-**Status:** Done.
+**Status:** Done for documentation; remediation remains upstream-blocked.
 
-**Purpose:** reduce or remove current GitHub Dependabot alerts before the next
-release.
+**Purpose:** record current GitHub Dependabot alerts, verification commands, and
+the recommended decision policy before the next release.
 
-**Current Alerts:**
+**Status Summary:**
 
-- `rand` low severity: already updated in `Cargo.lock` to `0.8.6`; verify that
-  GitHub dismisses the alert after rescanning.
-- `glib` medium severity: currently pulled through Linux Tauri dependencies
-  (`gtk`, `webkit2gtk`, `wry`, `tauri-runtime-wry`). The patched line starts at
-  `glib 0.20.0`, but direct overrides may be incompatible with the current GTK
-  dependency chain.
-
-**Approach:**
-
-- Run dependency graph checks locally with `cargo tree --target all`.
-- Try upstream-compatible `cargo update` changes first.
-- If Tauri or GTK still pins `glib 0.18.x`, record the blocker in release notes
-  and keep Dependabot enabled so a future upstream update can close it.
-- Avoid `[patch]` or forced transitive upgrades unless Cargo proves the full
-  dependency graph accepts them and all backend checks pass.
-
-**Resolution Notes:**
-
-- Compatible Cargo updates were applied with `cargo update`.
-- `rand 0.7.3` remains in the graph through
-  `selectors 0.24.0 -> kuchikiki 0.8.8-speedreader -> tauri-utils 2.8.3`.
-  Cargo rejects `selectors 0.25.0` because `kuchikiki` requires
-  `selectors = "^0.24"`.
-- `glib 0.18.5` remains in the Linux Tauri stack through `gtk 0.18.2`.
-  Cargo rejects `glib 0.20.0` because `gtk` requires `glib = "^0.18"`.
-- Both remaining Dependabot alerts are therefore upstream dependency-chain
-  blockers in the current Tauri 2.10.x GTK stack, not direct GitPulse
+- `glib` medium severity remains in the Linux Tauri/GTK/WebKit stack.
+- `rand` low severity remains through the `selectors`/`kuchikiki`/`tauri-utils`
+  transitive build-time path.
+- Both alerts are upstream dependency-chain blockers, not direct GitPulse
   dependencies.
+- Detailed paths, commands, and the no-forced-upgrade decision are documented in
+  [Security Dependency Status](security-dependency-status.md).
 
 **Acceptance Criteria:**
 
-- Dependabot alerts are either closed by compatible updates or documented with a
-  precise upstream blocker.
-- `cargo test --manifest-path src-tauri/Cargo.toml` passes.
-- `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
-  passes when dependency changes touch Rust crates.
+- Dependabot alerts are documented with precise upstream blockers.
+- The documentation includes local and GitHub verification commands.
+- The release decision explicitly avoids forced transitive patches unless Cargo
+  accepts the graph and the normal verification suite passes.
 
-**Commit:** `chore(security): resolve dependency alerts`
+**Commit:** `docs(security): document dependency alert status`
+
+---
+
+## Ticket V4-QA1: Add Real Desktop E2E Smoke Coverage
+
+**Status:** Planned.
+
+**Purpose:** close the QA gap where CI builds desktop artifacts but does not
+launch a real Tauri WebView and exercise the Rust command boundary from the UI.
+
+**Approach:**
+
+- Use the minimal roadmap in
+  [Security Dependency Status](security-dependency-status.md#minimal-desktop-e2e-roadmap).
+- Start with a Linux WebDriver lane using `tauri-driver`, `WebKitWebDriver`,
+  and `xvfb`.
+- Cover one fixture-repository scan from UI launch through scan completion and a
+  visible Dashboard or Reports assertion.
+- Add Windows only after Linux is stable. Keep macOS as manual packaged-build
+  smoke coverage unless upstream WebDriver support changes.
+
+**Acceptance Criteria:**
+
+- The first E2E test launches the real Tauri app, not only the Vite web UI.
+- Test data and app data are isolated in temporary directories.
+- The initial CI job can run non-blocking until it has a short stable history.
+
+**Commit:** `test(e2e): add desktop smoke coverage`
 
 ---
 

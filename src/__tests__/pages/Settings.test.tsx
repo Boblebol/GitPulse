@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AppProvider } from "../../context/AppContext";
+import { useAppContext } from "../../context/AppContext";
 import Settings from "../../pages/Settings";
+import type { ScanRunStatus } from "../../types";
 
 jest.mock("@tauri-apps/api/core", () => ({
   invoke: jest.fn(),
@@ -47,6 +50,7 @@ describe("Settings", () => {
 
   afterEach(() => {
     confirmSpy.mockRestore();
+    queryClient.clear();
     jest.clearAllMocks();
     window.localStorage.clear();
   });
@@ -59,6 +63,46 @@ describe("Settings", () => {
         </AppProvider>
       </QueryClientProvider>,
     );
+  }
+
+  function renderSettingsWithContext(children: ReactNode) {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <AppProvider>
+          {children}
+          <Settings />
+        </AppProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  function SeedWorkspaceScanProgress({ status }: { status: ScanRunStatus }) {
+    const { setWorkspaceId, setScanningRepoId, setScanProgress } = useAppContext();
+    const initialized = useRef(false);
+
+    useEffect(() => {
+      if (initialized.current) return;
+      initialized.current = true;
+      setWorkspaceId("ws1");
+      setScanningRepoId("repo1");
+      setScanProgress({
+        repo_id: "repo1",
+        scan_run_id: "scan1",
+        status,
+        commits_indexed: 3,
+        files_processed: 12,
+        cursor_sha: null,
+        target_head_sha: "abc123",
+      });
+    }, [setScanProgress, setScanningRepoId, setWorkspaceId, status]);
+
+    return null;
+  }
+
+  function uiConsoleMessages(spy: jest.SpyInstance) {
+    return spy.mock.calls
+      .map((call) => String(call[0]))
+      .filter((message) => message.startsWith("[UI]"));
   }
 
   it("deletes all local GitPulse data after confirmation", async () => {
@@ -194,5 +238,68 @@ describe("Settings", () => {
 
     expect(screen.getByRole("checkbox", { name: /import api/i })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /import web/i })).toBeChecked();
+  });
+
+  it("keeps scan actions quiet in the console while preserving mutations", async () => {
+    (invoke as jest.Mock).mockImplementation((command: string) => {
+      if (command === "list_workspaces") {
+        return Promise.resolve([{ id: "ws1", name: "Product", created_at: "2026-05-02T10:00:00Z" }]);
+      }
+      if (command === "list_repos") {
+        return Promise.resolve([
+          {
+            id: "repo1",
+            workspace_id: "ws1",
+            name: "api",
+            path: "/projects/api",
+            active_branch: "main",
+            last_indexed_commit_sha: null,
+            created_at: "2026-05-02T10:00:00Z",
+          },
+        ]);
+      }
+      if (command === "list_repo_branches") return Promise.resolve(["main"]);
+      if (command === "trigger_scan") {
+        return Promise.resolve({ commits_added: 2, files_processed: 4 });
+      }
+      if (command === "pause_scan") return Promise.reject("pause failed");
+      return Promise.resolve([]);
+    });
+    const consoleLogSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const { unmount } = renderSettings();
+
+      await userEvent.click(await screen.findByText("Product"));
+      const syncButton = await screen.findByRole("button", { name: /sync/i });
+      await userEvent.click(syncButton);
+
+      await waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith("trigger_scan", { repoId: "repo1" });
+      });
+      await waitFor(() => {
+        expect(syncButton).toBeEnabled();
+      });
+
+      expect(uiConsoleMessages(consoleLogSpy)).toEqual([]);
+
+      unmount();
+      renderSettingsWithContext(<SeedWorkspaceScanProgress status="running" />);
+      const pauseButton = await screen.findByRole("button", { name: /pause/i });
+      await userEvent.click(pauseButton);
+
+      await waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith("pause_scan", { scanRunId: "scan1" });
+      });
+      await waitFor(() => {
+        expect(pauseButton).toBeEnabled();
+      });
+
+      expect(uiConsoleMessages(consoleErrorSpy)).toEqual([]);
+    } finally {
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

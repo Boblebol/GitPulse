@@ -190,18 +190,9 @@ export function useSetRepoBranch() {
 export function useTriggerScan() {
   const qc = useQueryClient();
   return useMutation<ScanResult, string, string>({
-    mutationFn: async (repoId) => {
-      console.log("[Scan] Starting scan for repo", repoId);
-      const result = await invoke("trigger_scan", { repoId });
-      console.log("[Scan] Completed for repo", repoId, result);
-      return result as ScanResult;
-    },
+    mutationFn: (repoId) => invoke<ScanResult>("trigger_scan", { repoId }),
     onSuccess: (_data, repoId) => {
-      console.log("[Scan] onSuccess callback triggered for repo", repoId);
       invalidateScanDependentQueries(qc, repoId);
-    },
-    onError: (error, repoId) => {
-      console.error("[Scan] Error scanning repo", repoId, error);
     },
   });
 }

@@ -7,6 +7,11 @@ named `vX.Y.Z` or release-candidate tags named `vX.Y.Z-rc.N`.
 
 ## [Unreleased]
 
+### Added
+
+- Added bulk folder import so users can add multiple repositories from one or
+  more folders in a single flow.
+
 ## [0.3.0] - 2026-04-30
 
 ### Added

@@ -5,6 +5,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import type { ReactNode } from "react";
+import type { TooltipValueType } from "recharts";
 
 export interface ChartPoint {
   date: string;  // YYYY-MM-DD
@@ -73,10 +75,11 @@ export default function ActivityChart({
             fontFamily: "Public Sans, sans-serif",
           }}
           labelStyle={{ color: "#9ba5c0", marginBottom: 2, fontSize: 11 }}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(v: any) => [Number(v).toFixed(1), valueLabel]}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          labelFormatter={(label: any) => toMD(String(label))}
+          formatter={(v: TooltipValueType | undefined) => [
+            Number(v ?? 0).toFixed(1),
+            valueLabel,
+          ]}
+          labelFormatter={(label: ReactNode) => toMD(String(label ?? ""))}
         />
         <Area
           type="monotone"

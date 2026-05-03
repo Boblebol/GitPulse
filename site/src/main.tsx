@@ -50,7 +50,7 @@ const features = [
   {
     icon: <FileText size={22} />,
     title: "Weekly recaps",
-    text: "Regenerate a weekly repo or workspace summary and copy deterministic Markdown for reviews or OSS updates.",
+    text: "Regenerate weekly repo or workspace summaries and reuse them in Markdown, CSV, PDF, or PPTX report exports.",
   },
   {
     icon: <ShieldCheck size={22} />,
@@ -59,8 +59,8 @@ const features = [
   },
   {
     icon: <BookOpen size={22} />,
-    title: "Shareable reports",
-    text: "Copy deterministic Markdown for Dashboard, Code Health, and Weekly Recap updates without sending data anywhere.",
+    title: "Report exports",
+    text: "Copy Markdown or download CSV, PDF, and PPTX for Dashboard, Code Health, and Weekly Recap updates without sending data anywhere.",
   },
   {
     icon: <Sparkles size={22} />,
@@ -80,7 +80,7 @@ const docs = [
   ["Design", "App palette, icon direction, landing parity, and destructive data UX.", `${repoUrl}/blob/master/DESIGN.md`],
   ["Architecture", "Repository architecture notes and implementation context.", `${repoUrl}/blob/master/architecture_md.md`],
   ["V2 plan", "Completed plan for scoped stats, time filters, dashboard, branches, and aliases.", `${repoUrl}/blob/master/docs/development-plan-v2.md`],
-  ["Retention roadmap", "Versioned plan for tours, demo mode, insights, recaps, and return workflows.", `${repoUrl}/blob/master/docs/superpowers/plans/2026-04-26-retention-product-roadmap.md`],
+  ["V4 plan", "Completed plan for security, aggregate rebuilds, Reports exports, and scan isolation.", `${repoUrl}/blob/master/docs/development-plan-v4.md`],
   ["Release process", "How maintainers prepare tags and publish desktop builds.", `${repoUrl}/blob/master/docs/release.md`],
   ["Changelog", "Human-readable release history.", `${repoUrl}/blob/master/CHANGELOG.md`],
   ["Contributing", "Development rules, verification commands, and product principles.", `${repoUrl}/blob/master/CONTRIBUTING.md`],
@@ -110,15 +110,15 @@ const tutorials = [
   },
   {
     title: "Prepare a weekly recap",
-    steps: ["Select a repo or switch to workspace scope.", "Open Weekly Recap.", "Pick the week to regenerate.", "Copy the Markdown into a review note or release update."],
+    steps: ["Select a repo or switch to workspace scope.", "Open Weekly Recap.", "Pick the week to regenerate.", "Copy Markdown, or export it from Reports when you need CSV, PDF, or PPTX."],
   },
   {
     title: "Track code areas",
     steps: ["Open Watchlists.", "Add a file, directory, or selected repo.", "Use a bounded time range.", "Review commits, churn, hotspot, silo, and volatility deltas."],
   },
   {
-    title: "Share a report",
-    steps: ["Select the repo or workspace scope.", "Open Reports.", "Pick Dashboard, Code Health, or Weekly Recap.", "Copy the generated Markdown into your update."],
+    title: "Export a report",
+    steps: ["Select the repo or workspace scope.", "Open Reports.", "Pick Dashboard, Code Health, or Weekly Recap.", "Copy Markdown or download CSV, PDF, or PPTX."],
   },
   {
     title: "Review achievements",

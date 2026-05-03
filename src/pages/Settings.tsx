@@ -666,18 +666,15 @@ export default function Settings() {
                       <button
                         disabled={isScanActionPending || pauseScan.isPending || scanningRepoId !== null}
                         onClick={() => {
-                          console.log("[UI] Sync clicked for repo", r.id);
                           setScanningRepoId(r.id);
                           setSyncStatus("Fetching commits…");
                           triggerScan.mutate(r.id, {
                             onSuccess: (result) => {
-                              console.log("[UI] Sync success for repo", r.id, result);
                               addNotification(`${r.name}: ${result.commits_added} commits scanned`, "success");
                               setScanningRepoId(null);
                               setSyncStatus("");
                             },
-                            onError: (error) => {
-                              console.error("[UI] Sync error for repo", r.id, error);
+                            onError: () => {
                               addNotification(`${r.name}: Scan failed`, "error");
                               setScanningRepoId(null);
                               setSyncStatus("");
@@ -699,8 +696,7 @@ export default function Settings() {
                               onSuccess: () => {
                                 addNotification(`${r.name}: Scan paused`, "success");
                               },
-                              onError: (error) => {
-                                console.error("[UI] Pause scan error for repo", r.id, error);
+                              onError: () => {
                                 addNotification(`${r.name}: Pause failed`, "error");
                               },
                             });
@@ -721,8 +717,7 @@ export default function Settings() {
                               onSuccess: () => {
                                 addNotification(`${r.name}: Scan resumed`, "success");
                               },
-                              onError: (error) => {
-                                console.error("[UI] Resume scan error for repo", r.id, error);
+                              onError: () => {
                                 addNotification(`${r.name}: Resume failed`, "error");
                                 setScanningRepoId(null);
                                 setSyncStatus("");

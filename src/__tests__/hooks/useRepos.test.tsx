@@ -451,7 +451,7 @@ describe("useRepos hooks", () => {
   });
 
   describe("useTriggerScan", () => {
-    it("triggers a scan on a repo", async () => {
+    it("triggers a scan on a repo without writing scan logs", async () => {
       const mockScanResult = { commits_added: 100 };
       (invoke as jest.Mock).mockResolvedValue(mockScanResult);
 
@@ -468,7 +468,10 @@ describe("useRepos hooks", () => {
       });
 
       expect(invoke).toHaveBeenCalledWith("trigger_scan", { repoId: "repo1" });
-      expect(consoleSpy).toHaveBeenCalledWith("[Scan] Starting scan for repo", "repo1");
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringMatching(/^\[Scan\]/),
+        expect.anything(),
+      );
 
       consoleSpy.mockRestore();
     });
@@ -507,7 +510,7 @@ describe("useRepos hooks", () => {
       expect(invalidateQuerySpy).toHaveBeenCalled();
     });
 
-    it("logs scan completion", async () => {
+    it("does not log scan completion", async () => {
       const mockScanResult = { commits_added: 150 };
       (invoke as jest.Mock).mockResolvedValue(mockScanResult);
 
@@ -523,12 +526,12 @@ describe("useRepos hooks", () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith("[Scan] Completed for repo", "repo1", mockScanResult);
+      expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });
 
-    it("logs onSuccess callback", async () => {
+    it("does not log onSuccess callback", async () => {
       const mockScanResult = { commits_added: 100 };
       (invoke as jest.Mock).mockResolvedValue(mockScanResult);
 
@@ -544,7 +547,7 @@ describe("useRepos hooks", () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith("[Scan] onSuccess callback triggered for repo", "repo1");
+      expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });

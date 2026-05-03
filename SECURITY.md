@@ -35,3 +35,12 @@ Security-sensitive areas include:
 - any future import/export or sharing feature
 
 GitPulse should not transmit repository data by default.
+
+## Dependency Alert Handling
+
+Current transitive Dependabot alerts, verification commands, and the recommended
+no-forced-upgrade decision are tracked in
+[docs/security-dependency-status.md](docs/security-dependency-status.md).
+
+Do not dismiss transitive dependency alerts without recording the upstream
+blocker, the verification command, and the condition that will trigger a recheck.

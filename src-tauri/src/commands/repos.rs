@@ -328,10 +328,12 @@ pub(crate) async fn inner_add_repo(
     name: String,
     provided_branch: Option<String>,
 ) -> Result<Repo, RepoError> {
-    if !Path::new(&path).exists() {
+    let repo_path = Path::new(&path);
+    if !repo_path.exists() {
         return Err(RepoError::PathNotFound(path));
     }
 
+    let path = repo_path_string(repo_path);
     let branch = detect_repo_branch(&path, provided_branch)?;
 
     let mut repo = Repo::new(workspace_id, name, &path);
@@ -682,9 +684,57 @@ mod tests {
         .unwrap();
 
         assert_eq!(r.workspace_id, ws.id);
-        assert_eq!(r.path, tmp.path().to_str().unwrap());
+        assert_eq!(r.path, repo_path_string(tmp.path()));
         // branch should have been detected (master or main)
         assert!(!r.active_branch.is_empty());
+    }
+
+    #[tokio::test]
+    async fn add_repo_canonicalizes_path_and_matches_discovery_duplicates() {
+        let pool = test_pool().await;
+        let root = TempDir::new().unwrap();
+        let repo_dir = root.path().join("api");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        init_repo(&repo_dir);
+        let non_canonical_path = repo_dir.join("..").join("api");
+        let canonical_path = repo_path_string(&repo_dir);
+
+        let ws = inner_create_workspace(&pool, "W".into()).await.unwrap();
+        let added = inner_add_repo(
+            &pool,
+            ws.id.clone(),
+            non_canonical_path.to_string_lossy().to_string(),
+            "api".into(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(added.path, canonical_path);
+
+        let candidates = inner_discover_repo_import_candidates(
+            &pool,
+            vec![root.path().to_string_lossy().to_string()],
+        )
+        .await
+        .unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].path, canonical_path);
+        assert!(candidates[0].already_exists);
+
+        let duplicate = inner_add_repo(
+            &pool,
+            ws.id.clone(),
+            repo_dir.to_string_lossy().to_string(),
+            "api duplicate".into(),
+            None,
+        )
+        .await;
+        assert!(duplicate.is_err());
+
+        let repos = inner_list_repos(&pool, &ws.id).await.unwrap();
+        assert_eq!(repos.len(), 1);
+        assert_eq!(repos[0].path, canonical_path);
     }
 
     #[tokio::test]

@@ -78,6 +78,9 @@ cd src-tauri
 cargo clippy --all-targets -- -D warnings
 ```
 
+Security dependency status and the desktop E2E QA roadmap are tracked in
+[docs/security-dependency-status.md](docs/security-dependency-status.md).
+
 Large-repo synthetic benchmark (ignored by default):
 
 ```bash
