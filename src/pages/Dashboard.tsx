@@ -25,6 +25,11 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { activityRowsToChartPoints } from "../utils/dashboard";
+import {
+  formatScanCommitProgress,
+  formatScanEta,
+  formatScanProgressPercent,
+} from "../utils/scanProgress";
 import { timeRangeToQuery } from "../utils/timeRange";
 
 function fmt(n: number): string {
@@ -90,6 +95,10 @@ export default function Dashboard() {
     : scanProgress?.status === "completed"
       ? "bg-tertiary-container text-tertiary"
       : "bg-surface-container-high text-on-surface";
+  const scanProgressPercentLabel = scanProgress
+    ? formatScanProgressPercent(scanProgress)
+    : null;
+  const scanEtaLabel = scanProgress ? formatScanEta(scanProgress) : null;
 
   const handleSyncRepo = () => {
     if (!repoId) return;
@@ -220,17 +229,39 @@ export default function Dashboard() {
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
               <span className="whitespace-nowrap">
-                Commits: <span className="font-semibold">{fmt(scanProgress.commits_indexed)}</span>
+                Commits:{" "}
+                <span className="font-semibold">
+                  {formatScanCommitProgress(scanProgress)}
+                </span>
               </span>
               <span className="whitespace-nowrap">
                 Files: <span className="font-semibold">{fmt(scanProgress.files_processed)}</span>
               </span>
+              {scanProgressPercentLabel && (
+                <span className="whitespace-nowrap font-semibold">
+                  {scanProgressPercentLabel}
+                </span>
+              )}
+              {scanEtaLabel && scanProgress.status === "running" && (
+                <span className="whitespace-nowrap">ETA {scanEtaLabel}</span>
+              )}
             </div>
             {(scanProgress.error || scanProgress.message) && (
               <p className="min-w-0 flex-1 basis-full truncate text-xs opacity-80 sm:basis-auto">
                 {scanProgress.error || scanProgress.message}
               </p>
             )}
+            {scanProgress.progress_percent != null &&
+              Number.isFinite(scanProgress.progress_percent) && (
+                <div className="basis-full overflow-hidden rounded-full bg-surface-container-highest">
+                  <div
+                    className="h-1.5 rounded-full bg-tertiary transition-all"
+                    style={{
+                      width: `${Math.max(0, Math.min(100, scanProgress.progress_percent))}%`,
+                    }}
+                  />
+                </div>
+              )}
             {(isScanRunning || canResumeScan) && (
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 {isScanRunning && (

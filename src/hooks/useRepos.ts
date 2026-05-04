@@ -23,6 +23,10 @@ type ScanProgressResponse = Partial<ScanProgress> & {
   scanRunId?: string;
   commitsIndexed?: number;
   filesProcessed?: number;
+  totalCommits?: number | null;
+  progressPercent?: number | null;
+  elapsedSeconds?: number | null;
+  etaSeconds?: number | null;
   cursorSha?: string | null;
   lastIndexedCommitSha?: string | null;
   targetHeadSha?: string;
@@ -52,6 +56,10 @@ function normalizeScanProgress(progress: ScanProgressResponse | null): ScanProgr
     status: progress.status ?? "running",
     commits_indexed: progress.commits_indexed ?? progress.commitsIndexed ?? 0,
     files_processed: progress.files_processed ?? progress.filesProcessed ?? 0,
+    total_commits: progress.total_commits ?? progress.totalCommits ?? null,
+    progress_percent: progress.progress_percent ?? progress.progressPercent ?? null,
+    elapsed_seconds: progress.elapsed_seconds ?? progress.elapsedSeconds ?? null,
+    eta_seconds: progress.eta_seconds ?? progress.etaSeconds ?? null,
     cursor_sha: progress.cursor_sha ?? progress.cursorSha ?? null,
     target_head_sha: progress.target_head_sha ?? progress.targetHeadSha ?? "",
   };

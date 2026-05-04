@@ -53,6 +53,10 @@ export interface ScanProgress {
   status: ScanRunStatus;
   commits_indexed: number;
   files_processed: number;
+  total_commits?: number | null;
+  progress_percent?: number | null;
+  elapsed_seconds?: number | null;
+  eta_seconds?: number | null;
   cursor_sha: string | null;
   last_indexed_commit_sha?: string | null;
   target_head_sha: string;

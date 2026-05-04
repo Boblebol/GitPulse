@@ -80,6 +80,10 @@ pub struct ScanProgressPayload {
     pub status: ScanRunStatus,
     pub commits_indexed: i64,
     pub files_processed: i64,
+    pub total_commits: Option<i64>,
+    pub progress_percent: Option<f64>,
+    pub elapsed_seconds: Option<f64>,
+    pub eta_seconds: Option<f64>,
     pub cursor_sha: Option<String>,
     pub target_head_sha: String,
     pub message: Option<String>,
@@ -213,6 +217,15 @@ async fn scan_repo_with_options(
         tokio::task::spawn_blocking(move || resolve_target_head_sha(&path_owned, &branch_owned))
             .await
             .map_err(|e| GitError::Join(e.to_string()))??;
+    let path_owned = repo_path.to_path_buf();
+    let branch_owned = active_branch.to_string();
+    let estimate_since_sha = last_sha.clone();
+    let total_commits = tokio::task::spawn_blocking(move || {
+        count_commits_to_scan(&path_owned, &branch_owned, estimate_since_sha.as_deref())
+    })
+    .await
+    .map_err(|e| GitError::Join(e.to_string()))??;
+    let progress_estimator = ScanProgressEstimator::new(Some(total_commits));
 
     let scan_run = create_scan_run(pool, repo_id, active_branch, &target_head_sha).await?;
     emit_scan_progress(
@@ -225,6 +238,7 @@ async fn scan_repo_with_options(
             0,
             None,
             &target_head_sha,
+            progress_estimator.metrics(0, ScanRunStatus::Running),
             Some("Scan started".to_string()),
             None,
         ),
@@ -240,6 +254,7 @@ async fn scan_repo_with_options(
             target_head_sha: &target_head_sha,
             progress_callback: progress_callback.as_ref(),
             worktree_root,
+            progress_estimator,
         },
         last_sha,
         options,
@@ -262,6 +277,8 @@ async fn scan_repo_with_options(
                     completed_scan_run.files_processed,
                     completed_scan_run.cursor_sha,
                     &target_head_sha,
+                    progress_estimator
+                        .metrics(completed_scan_run.commits_indexed, ScanRunStatus::Completed),
                     Some("Scan completed".to_string()),
                     None,
                 ),
@@ -288,6 +305,8 @@ async fn scan_repo_with_options(
                     paused_scan_run.files_processed,
                     paused_scan_run.cursor_sha,
                     &target_head_sha,
+                    progress_estimator
+                        .metrics(paused_scan_run.commits_indexed, ScanRunStatus::Paused),
                     Some("Scan paused".to_string()),
                     None,
                 ),
@@ -316,6 +335,8 @@ async fn scan_repo_with_options(
                     failed_scan_run.files_processed,
                     failed_scan_run.cursor_sha,
                     &target_head_sha,
+                    progress_estimator
+                        .metrics(failed_scan_run.commits_indexed, ScanRunStatus::Failed),
                     Some("Scan failed".to_string()),
                     Some(error_message),
                 ),
@@ -334,6 +355,7 @@ struct ScanBatchContext<'a> {
     target_head_sha: &'a str,
     progress_callback: Option<&'a ScanProgressCallback>,
     worktree_root: Option<&'a Path>,
+    progress_estimator: ScanProgressEstimator,
 }
 
 enum ScanBatchOutcome {
@@ -355,6 +377,7 @@ async fn scan_repo_batches(
         target_head_sha,
         progress_callback,
         worktree_root,
+        progress_estimator,
     } = context;
     let batch_size = options.batch_size.max(1);
     let mut since_sha = last_sha;
@@ -437,6 +460,7 @@ async fn scan_repo_batches(
                 files_processed as i64,
                 since_sha.clone(),
                 target_head_sha,
+                progress_estimator.metrics(commits_added as i64, ScanRunStatus::Running),
                 Some("Scan batch persisted".to_string()),
                 None,
             ),
@@ -484,6 +508,72 @@ async fn is_scan_run_paused(pool: &SqlitePool, scan_run_id: &str) -> Result<bool
         .is_some_and(|run| run.status == ScanRunStatus::Paused))
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ScanProgressEstimator {
+    total_commits: Option<i64>,
+    started_at: std::time::Instant,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct ScanProgressMetrics {
+    total_commits: Option<i64>,
+    progress_percent: Option<f64>,
+    elapsed_seconds: Option<f64>,
+    eta_seconds: Option<f64>,
+}
+
+impl ScanProgressEstimator {
+    fn new(total_commits: Option<i64>) -> Self {
+        Self {
+            total_commits,
+            started_at: std::time::Instant::now(),
+        }
+    }
+
+    fn metrics(self, commits_indexed: i64, status: ScanRunStatus) -> ScanProgressMetrics {
+        let elapsed_seconds = self.started_at.elapsed().as_secs_f64();
+        let progress_percent = self
+            .total_commits
+            .map(|total| progress_percent(commits_indexed, total, status));
+        let eta_seconds = match status {
+            ScanRunStatus::Completed => Some(0.0),
+            ScanRunStatus::Running => self
+                .total_commits
+                .and_then(|total| eta_seconds(commits_indexed, total, elapsed_seconds)),
+            ScanRunStatus::Paused | ScanRunStatus::Failed => None,
+        };
+
+        ScanProgressMetrics {
+            total_commits: self.total_commits,
+            progress_percent,
+            elapsed_seconds: Some(elapsed_seconds),
+            eta_seconds,
+        }
+    }
+}
+
+fn progress_percent(commits_indexed: i64, total_commits: i64, status: ScanRunStatus) -> f64 {
+    if status == ScanRunStatus::Completed || total_commits <= 0 {
+        return 100.0;
+    }
+
+    let percent = (commits_indexed.max(0) as f64 / total_commits as f64) * 100.0;
+    percent.clamp(0.0, 100.0)
+}
+
+fn eta_seconds(commits_indexed: i64, total_commits: i64, elapsed_seconds: f64) -> Option<f64> {
+    if commits_indexed <= 0 || total_commits <= commits_indexed || elapsed_seconds <= 0.0 {
+        return None;
+    }
+
+    let commits_per_second = commits_indexed as f64 / elapsed_seconds;
+    if commits_per_second <= 0.0 {
+        return None;
+    }
+
+    Some((total_commits - commits_indexed) as f64 / commits_per_second)
+}
+
 impl ScanProgressPayload {
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -494,6 +584,7 @@ impl ScanProgressPayload {
         files_processed: i64,
         cursor_sha: Option<String>,
         target_head_sha: &str,
+        metrics: ScanProgressMetrics,
         message: Option<String>,
         error: Option<String>,
     ) -> Self {
@@ -503,6 +594,10 @@ impl ScanProgressPayload {
             status,
             commits_indexed,
             files_processed,
+            total_commits: metrics.total_commits,
+            progress_percent: metrics.progress_percent,
+            elapsed_seconds: metrics.elapsed_seconds,
+            eta_seconds: metrics.eta_seconds,
             cursor_sha,
             target_head_sha: target_head_sha.to_string(),
             message,
@@ -859,6 +954,25 @@ fn collect_commits_with_worktree_root(
     );
 
     Ok(commits)
+}
+
+fn count_commits_to_scan(
+    repo_path: &Path,
+    active_branch: &str,
+    since_sha: Option<&str>,
+) -> Result<i64, GitError> {
+    let repo = Repository::open(repo_path).map_err(|_| GitError::NotFound {
+        path: repo_path.display().to_string(),
+    })?;
+    let walk = setup_revwalk(&repo, active_branch, since_sha)?;
+    let mut total = 0i64;
+
+    for oid_result in walk {
+        oid_result?;
+        total += 1;
+    }
+
+    Ok(total)
 }
 
 fn resolve_target_head_sha(repo_path: &Path, active_branch: &str) -> Result<String, GitError> {
@@ -1552,11 +1666,19 @@ mod tests {
         assert_eq!(events.last().unwrap().files_processed, 2);
         assert_eq!(events.last().unwrap().repo_id, repo_id);
         assert!(events.last().unwrap().cursor_sha.is_some());
+        assert_eq!(events.first().unwrap().total_commits, Some(2));
+        assert_eq!(events.first().unwrap().progress_percent, Some(0.0));
+        assert_eq!(events.last().unwrap().total_commits, Some(2));
+        assert_eq!(events.last().unwrap().progress_percent, Some(100.0));
+        assert_eq!(events.last().unwrap().eta_seconds, Some(0.0));
+        assert!(events.last().unwrap().elapsed_seconds.is_some());
 
         let serialized = serde_json::to_value(events.last().unwrap()).unwrap();
         assert_eq!(serialized["status"], "completed");
         assert_eq!(serialized["scan_run_id"].as_str().unwrap().len(), 36);
         assert!(serialized["target_head_sha"].as_str().unwrap().len() >= 40);
+        assert_eq!(serialized["total_commits"], 2);
+        assert_eq!(serialized["progress_percent"], 100.0);
     }
 
     #[tokio::test(flavor = "multi_thread")]

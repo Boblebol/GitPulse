@@ -625,6 +625,10 @@ describe("useRepos hooks", () => {
         status: "paused",
         commits_indexed: 12,
         files_processed: 4,
+        total_commits: 20,
+        progress_percent: 60,
+        elapsed_seconds: 30,
+        eta_seconds: 20,
         cursor_sha: "commit-a",
         target_head_sha: "commit-z",
         error_message: null,
@@ -643,10 +647,50 @@ describe("useRepos hooks", () => {
         status: "paused",
         commits_indexed: 12,
         files_processed: 4,
+        total_commits: 20,
+        progress_percent: 60,
+        elapsed_seconds: 30,
+        eta_seconds: 20,
         cursor_sha: "commit-a",
         target_head_sha: "commit-z",
       });
       expect(invoke).toHaveBeenCalledWith("get_scan_status", { repoId: "repo1" });
+    });
+
+    it("normalizes camelCase scan estimate fields from status responses", async () => {
+      (invoke as jest.Mock).mockResolvedValue({
+        id: "scan3",
+        repoId: "repo1",
+        status: "running",
+        commitsIndexed: 25,
+        filesProcessed: 10,
+        totalCommits: 100,
+        progressPercent: 25,
+        elapsedSeconds: 50,
+        etaSeconds: 150,
+        cursorSha: "commit-c",
+        targetHeadSha: "commit-z",
+      });
+
+      const { result } = renderHook(() => useScanStatus("repo1"), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toMatchObject({
+        repo_id: "repo1",
+        scan_run_id: "scan3",
+        status: "running",
+        commits_indexed: 25,
+        files_processed: 10,
+        total_commits: 100,
+        progress_percent: 25,
+        elapsed_seconds: 50,
+        eta_seconds: 150,
+        cursor_sha: "commit-c",
+        target_head_sha: "commit-z",
+      });
     });
 
     it("maps failed scan run errors from the backend status shape", async () => {
@@ -741,6 +785,10 @@ describe("useRepos hooks", () => {
         status: "running",
         commits_indexed: 12,
         files_processed: 4,
+        total_commits: 100,
+        progress_percent: 12,
+        elapsed_seconds: 60,
+        eta_seconds: 440,
         cursor_sha: "commit-a",
         target_head_sha: "commit-z",
         message: "Indexing commits",
@@ -752,6 +800,10 @@ describe("useRepos hooks", () => {
           status: "running",
           commits_indexed: 12,
           files_processed: 4,
+          total_commits: 100,
+          progress_percent: 12,
+          elapsed_seconds: 60,
+          eta_seconds: 440,
         });
         expect(result.current.scanningRepoId).toBe("repo1");
         expect(result.current.syncStatus).toBe("Indexing commits");

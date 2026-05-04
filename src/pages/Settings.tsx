@@ -32,6 +32,11 @@ import FieldHint from "../components/FieldHint";
 import HelpTooltip from "../components/HelpTooltip";
 import PageHelp from "../components/PageHelp";
 import BulkRepoImport from "../components/settings/BulkRepoImport";
+import {
+  formatScanCommitProgress,
+  formatScanEta,
+  formatScanProgressPercent,
+} from "../utils/scanProgress";
 
 const DEFAULT_FORMULA =
   "(commits * 10) + (insertions * 0.5) - (deletions * 0.3) + (files_touched * 2) + (streak_bonus * 3)";
@@ -553,6 +558,10 @@ export default function Settings() {
                 const canPauseScan = scanStatus === "running";
                 const canResumeScan = scanStatus === "paused" || scanStatus === "failed";
                 const progressMessage = scanProgress?.error || scanProgress?.message;
+                const progressPercentLabel = scanProgress
+                  ? formatScanProgressPercent(scanProgress)
+                  : null;
+                const etaLabel = scanProgress ? formatScanEta(scanProgress) : null;
 
                 return (
                   <div
@@ -572,8 +581,14 @@ export default function Settings() {
                               <span className={scanProgress.error ? "font-medium text-error" : "font-medium text-tertiary"}>
                                 {formatScanStatus(scanProgress.status)}
                               </span>
-                              <span>{scanProgress.commits_indexed} commits</span>
+                              <span>{formatScanCommitProgress(scanProgress)}</span>
                               <span>{scanProgress.files_processed} files</span>
+                              {progressPercentLabel && (
+                                <span className="font-medium">{progressPercentLabel}</span>
+                              )}
+                              {etaLabel && scanProgress.status === "running" && (
+                                <span>ETA {etaLabel}</span>
+                              )}
                               {progressMessage && (
                                 <span className={scanProgress.error ? "text-error" : "text-on-surface-variant"}>
                                   {progressMessage}
